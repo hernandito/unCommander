@@ -4186,6 +4186,9 @@
       <div class="st-panel" data-panel="about">
         <div class="st-about">unCommander${root.dataset.version ? ` <span class="mono">${esc(root.dataset.version)}</span>` : ''} - source code, the full user guide, and a place to report bugs or ask for features:
           <a href="https://github.com/hernandito/unCommander" target="_blank" rel="noopener">github.com/hernandito/unCommander ↗</a></div>
+        <a class="st-bmc" href="https://www.buymeacoffee.com/hernandito" target="_blank" rel="noopener" title="Like unCommander? Buy the author a coffee">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="cup" d="M4.5 8.5h12.2l-1.3 10.2a2 2 0 0 1-2 1.8H7.8a2 2 0 0 1-2-1.8z"/><path class="rim" d="M3.6 6.3h14v2.2h-14z"/><path class="steam" d="M8.6 4.6c0-1 .9-1.1.9-2.1M11.6 4.6c0-1 .9-1.1.9-2.1"/><path class="handle" d="M16.6 10.3h1.6a2.2 2.2 0 0 1 0 4.4h-2.1"/></svg>
+          Buy me a coffee</a>
       </div>
 
       <div class="st-panel" data-panel="tools">

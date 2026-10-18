@@ -1274,3 +1274,9 @@ body { --uc-press-bg: var(--hover-button-background); --uc-press-ink: var(--hove
 #uc div.up { border: none; }
 #uc .st-about { font-size: calc(13px * var(--fs, 1)); line-height: 1.55; }
 #uc .st-about a { font-weight: 600; color: var(--accent); white-space: nowrap; }
+/* Settings > About: Buy me a coffee */
+#uc .st-bmc { display: inline-flex; width: max-content; align-self: flex-start; align-items: center; gap: 7px; margin-top: 10px; padding: 7px 14px 7px 10px; border-radius: 999px; background: #ffdd00; color: #0d0c22 !important; font: 700 calc(13px * var(--fs, 1))/1 var(--sans); text-decoration: none !important; border: 1px solid #e6c700; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+#uc .st-bmc:hover { filter: brightness(1.04); box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+#uc .st-bmc svg { width: calc(20px * var(--fs, 1)); height: calc(20px * var(--fs, 1)); fill: none; stroke: #0d0c22; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+#uc .st-bmc svg .cup { fill: #fff; }
+#uc .st-bmc svg .rim { fill: #0d0c22; }
