@@ -25,6 +25,8 @@
 
 It's built for real Unraid servers: it understands shares, disks and pools, runs big jobs in the background, keeps deleted items in a trash you can restore from, and lets you undo most things. It doesn't touch Unraid's own files and doesn't replace the built-in file manager.
 
+Built with Claude AI.
+
 ---
 
 ## ✨ Features
