@@ -4183,6 +4183,11 @@
         <label class="st-radio"><input type="checkbox" class="st-notify" ${w.notify_unraid !== false ? 'checked' : ''}><span><b>Also send an unRAID notification</b><br><span class="muted">For jobs that finished while you weren't watching.</span></span></label>
       </div>
 
+      <div class="st-panel" data-panel="about">
+        <div class="st-about">unCommander${root.dataset.version ? ` <span class="mono">${esc(root.dataset.version)}</span>` : ''} - source code, the full user guide, and a place to report bugs or ask for features:
+          <a href="https://github.com/hernandito/unCommander" target="_blank" rel="noopener">github.com/hernandito/unCommander ↗</a></div>
+      </div>
+
       <div class="st-panel" data-panel="tools">
         <div class="muted">Bigger jobs that look across your disks. Each one opens in its own window; nothing changes until you choose to.</div>
         <div class="tl-card"><div class="tl-txt"><b>Empty folders on disks</b>
@@ -4294,10 +4299,10 @@
     $('.fs-reset', dlg).addEventListener('click', () => fsSet(100));
 
     /* Four tabs, each grouping related sections under a small heading. */
-    const GROUP = { gen: 'gen', touch: 'gen', jobs: 'gen', watch: 'gen', bm: 'bm', size: 'look', theme: 'look', look: 'look', hl: 'look', snd: 'look', safe: 'safe', sys: 'safe', trash: 'safe', tools: 'tools', keys: 'keys' };
+    const GROUP = { gen: 'gen', touch: 'gen', jobs: 'gen', watch: 'gen', about: 'gen', bm: 'bm', size: 'look', theme: 'look', look: 'look', hl: 'look', snd: 'look', safe: 'safe', sys: 'safe', trash: 'safe', tools: 'tools', keys: 'keys' };
     $$('.rd-box[data-app]', dlg).forEach(box => rdWire(box, w));
     $$('[data-tool]', dlg).forEach(b => b.addEventListener('click', () => { closeDlg(); if (b.dataset.tool === 'empty') openEmptyTool(); if (b.dataset.tool === 'movies') openMovieTool(); if (b.dataset.tool === 'tv') openTvTool(); }));
-    const HEAD = { gen: 'Menu name', touch: 'Tapping rows', jobs: 'When a job finishes', watch: 'Auto-refresh', size: 'Text size on this device', theme: 'Theme', keys: 'Keyboard shortcuts', look: 'Your own CSS', snd: 'Sounds', safe: 'Practice mode', sys: 'Whole system view', trash: 'Trash' };
+    const HEAD = { about: 'About', gen: 'Menu name', touch: 'Tapping rows', jobs: 'When a job finishes', watch: 'Auto-refresh', size: 'Text size on this device', theme: 'Theme', keys: 'Keyboard shortcuts', look: 'Your own CSS', snd: 'Sounds', safe: 'Practice mode', sys: 'Whole system view', trash: 'Trash' };
     $$('.st-panel', dlg).forEach(pn => {
       pn.dataset.group = GROUP[pn.dataset.panel] || pn.dataset.panel;
       if (HEAD[pn.dataset.panel]) pn.insertAdjacentHTML('afterbegin', `<h3 class="st-h">${HEAD[pn.dataset.panel]}</h3>`);

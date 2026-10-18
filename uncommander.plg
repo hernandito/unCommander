@@ -3,7 +3,7 @@
 <!ENTITY name      "uncommander">
 <!ENTITY author    "hernandito">
 <!ENTITY version   "2026.10.18">
-<!ENTITY github    "hernandito/uncommander">
+<!ENTITY github    "hernandito/unCommander">
 <!ENTITY branch    "main">
 <!ENTITY raw       "https://raw.githubusercontent.com/&github;/&branch;">
 <!ENTITY pluginURL "&raw;/&name;.plg">
@@ -66,7 +66,7 @@ mkdir -p /usr/local/emhttp/plugins/uncommander /boot/config/plugins/uncommander
 
 <FILE Name="&plugdir;/css/uncommander.css">
   <URL>&raw;/source/css/uncommander.css</URL>
-  <MD5>2f03518c890ae6a35ea6848e1e172c9e</MD5>
+  <MD5>48a868e8969c7db229f5d0cd18c435a7</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/api.php">
@@ -111,7 +111,7 @@ mkdir -p /usr/local/emhttp/plugins/uncommander /boot/config/plugins/uncommander
 
 <FILE Name="&plugdir;/js/uncommander.js">
   <URL>&raw;/source/js/uncommander.js</URL>
-  <MD5>816c168f39a8e1917407f581caff8040</MD5>
+  <MD5>b2829700248a7d85d866542de2e0a496</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/scripts/apply-menu-name">

@@ -25,8 +25,6 @@
 
 It's built for real Unraid servers: it understands shares, disks and pools, runs big jobs in the background, keeps deleted items in a trash you can restore from, and lets you undo most things. It doesn't touch Unraid's own files and doesn't replace the built-in file manager.
 
-Built with Claude AI.
-
 ---
 
 ## ✨ Features
@@ -113,7 +111,7 @@ Built with Claude AI.
 1. Go to **Plugins → Install Plugin**.
 2. Paste this URL and click **Install**:
    ```
-   https://raw.githubusercontent.com/hernandito/uncommander/main/uncommander.plg
+   https://raw.githubusercontent.com/hernandito/unCommander/main/uncommander.plg
    ```
 
 **Requirements:** Unraid 6.12 or newer. Internet access during install is only needed to download the files (and the 7-Zip program used for `.rar` / `.7z`).
@@ -148,7 +146,7 @@ The **›** button at the end of the button row slides in more: Folder sizes, Co
 ## 💬 Support
 
 * Forum thread: *(link coming soon)*
-* Bugs and ideas: [GitHub Issues](https://github.com/hernandito/uncommander/issues)
+* Bugs and ideas: [GitHub Issues](https://github.com/hernandito/unCommander/issues)
 
 ## 📄 License
 

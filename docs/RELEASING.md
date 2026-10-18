@@ -48,5 +48,5 @@ The `.plg` takes the branch from one entity at the top:
 ```
 
 Change it to a test branch, run `build-plg.sh --no-bump`, push that branch, and install from
-`https://raw.githubusercontent.com/hernandito/uncommander/<branch>/uncommander.plg`.
+`https://raw.githubusercontent.com/hernandito/unCommander/<branch>/uncommander.plg`.
 Set it back to `main` before merging.

@@ -1272,3 +1272,5 @@ body { --uc-press-bg: var(--hover-button-background); --uc-press-ink: var(--hove
 #uc .tl-iconopt { display: flex; gap: 8px; align-items: center; margin: 2px 0 8px; font-size: calc(13px * var(--fs, 1)); }
 /* the ".." name cell: Unraid's own stylesheet gives every div.up a border */
 #uc div.up { border: none; }
+#uc .st-about { font-size: calc(13px * var(--fs, 1)); line-height: 1.55; }
+#uc .st-about a { font-weight: 600; color: var(--accent); white-space: nowrap; }
