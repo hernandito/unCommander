@@ -1,0 +1,6 @@
+#!/usr/bin/php
+<?php
+/* unCommander — set the top-menu label from saved settings. Runs at install
+ * (every boot), so a custom name sticks. */
+require_once '/usr/local/emhttp/plugins/uncommander/include/lib.php';
+uc_apply_menu_name(uc_settings()['menu_name']);

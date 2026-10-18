@@ -1,0 +1,18 @@
+#!/bin/bash
+# unCommander — empty trash bins older than TRASH_DAYS (default 30), then
+# remove any trash folder left empty. Runs daily from cron. Bins are the dated
+# folders inside .uncommander-trash at the top of each share, disk, pool and
+# the flash drive.
+CFG=/boot/config/plugins/uncommander/uncommander.cfg
+TRASH_DAYS=30
+[ -f "$CFG" ] && source <(grep -E '^TRASH_DAYS=' "$CFG" | tr -d '"')
+[[ "$TRASH_DAYS" =~ ^[0-9]+$ ]] || TRASH_DAYS=30
+
+for trash in /mnt/user/*/.uncommander-trash /mnt/*/.uncommander-trash /mnt/*/*/.uncommander-trash /boot/.uncommander-trash; do
+  case "$trash" in /mnt/user/*/*/*|/mnt/user0/*) continue ;; esac
+  [ -d "$trash" ] || continue
+  # 0 = keep forever: only tidy away empty trash folders
+  [ "$TRASH_DAYS" -gt 0 ] && find "$trash" -mindepth 1 -maxdepth 1 -type d -mtime +"$TRASH_DAYS" -exec rm -rf -- {} +
+  rmdir "$trash" 2>/dev/null
+done
+exit 0

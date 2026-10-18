@@ -1,0 +1,3 @@
+**unCommander**
+
+A two-pane, Midnight Commander-style file manager for Unraid. Browse two folders side by side and copy, move, rename, delete, compress, extract and compare files with taps or F-keys - with background jobs, a trash with Undo, batch rename, a viewer and editor, and tools to find empty leftover folders, movie folders that lost their video (with Radarr) and TV shows with missing episodes (with Sonarr).

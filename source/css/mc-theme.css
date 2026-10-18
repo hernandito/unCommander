@@ -1,0 +1,111 @@
+/* unCommander - "Midnight Commander" theme (Settings > Look & sound > Theme).
+ * Everything here is scoped to #uc.uc-mc, so the Standard look, your own CSS and
+ * the Whole OS colours are untouched - they come back as soon as you switch to
+ * Standard. !important is used on purpose: while this theme is on it wins over
+ * your own CSS on the main screen, which was written for the Standard look.
+ *
+ * MC's classic colours on the main screen: blue panels, light grey text, white
+ * folders, a cyan cursor bar, yellow ticked files, cyan bars with black text.
+ * Windows and dialogs keep the Standard look. */
+
+#uc.uc-mc { background: #0000aa !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
+/* MC colours, font and square corners for the main screen only - the parts below.
+ * Windows (Settings, tools, Copy/Delete dialogs) and messages are NOT included:
+ * they keep the Standard look, with your own CSS. */
+#uc.uc-mc :is(.uc-appbar, .uc-alerts, .uc-bmrow, .uc-crumbs, .uc-cmpbar, .uc-panes, .uc-selbar, .uc-fkeys) {
+  --mc-blue: #0000aa; --mc-cyan: #00aaaa; --mc-gray: #c0c0c0;
+  --mc-white: #ffffff; --mc-yellow: #ffff55; --mc-black: #000000; --mc-line: #c0c0c0;
+  --ground: var(--mc-blue) !important; --surface: var(--mc-blue) !important; --surface-2: var(--mc-blue) !important; --surface-3: var(--mc-cyan) !important;
+  --line: var(--mc-line) !important; --line-soft: #3c3cc0 !important;
+  --ink: var(--mc-white) !important; --ink-2: var(--mc-gray) !important; --muted: var(--mc-gray) !important;
+  --accent: var(--mc-cyan) !important; --accent-ink: var(--mc-black) !important; --accent-soft: var(--mc-cyan) !important;
+  --ok: #55ff55 !important; --warn: var(--mc-yellow) !important; --danger: #ff5555 !important;
+  --r: 0px !important; --r-btn: 0px !important; --r-input: 0px !important;
+  --sans: "DejaVu Sans Mono", "Cascadia Mono", Consolas, "Lucida Console", ui-monospace, Menlo, monospace !important;
+  --mono: var(--sans) !important; --name-font: var(--sans) !important;
+  font-family: var(--sans) !important; color: var(--mc-gray);
+}
+#uc.uc-mc :is(.uc-appbar, .uc-alerts, .uc-bmrow, .uc-crumbs, .uc-cmpbar, .uc-panes, .uc-selbar, .uc-fkeys) :is(*, *::before, *::after) { border-radius: 0 !important; }
+
+/* ---------- top bar: like MC's menu bar - black on cyan ---------- */
+#uc.uc-mc .uc-appbar { background: var(--mc-cyan) !important; color: var(--mc-black) !important; border-bottom: none !important; }
+#uc.uc-mc .uc-logo, #uc.uc-mc .uc-logo span { color: var(--mc-black) !important; }
+#uc.uc-mc .uc-logo span { color: var(--mc-white) !important; }
+#uc.uc-mc .uc-chip { background: transparent !important; border: none !important; color: var(--mc-black) !important; }
+#uc.uc-mc .uc-appbar .uc-goto, #uc.uc-mc .uc-appbar .uc-jump { background: var(--mc-black) !important; color: var(--mc-gray) !important; border: 1px solid var(--mc-black) !important; outline: none !important; }
+#uc.uc-mc .uc-appbar .uc-jump::placeholder { color: #808080 !important; }
+#uc.uc-mc .uc-settings-btn, #uc.uc-mc .uc-sysseg .sys-b { background: var(--mc-cyan) !important; color: var(--mc-black) !important; border: none !important; box-shadow: none !important; }
+#uc.uc-mc .uc-sysseg .sys-b.on { background: var(--mc-black) !important; color: var(--mc-cyan) !important; padding-top: 4px !important; padding-bottom: 4px !important; }
+
+/* ---------- buttons on blue: MC style "[ text ]" ---------- */
+#uc.uc-mc .uc-bmrow, #uc.uc-mc .uc-crumbs, #uc.uc-mc .uc-selbar, #uc.uc-mc .uc-cmpbar { background: var(--mc-blue) !important; border: none !important; color: var(--mc-gray) !important; }
+#uc.uc-mc .uc-bm, #uc.uc-mc .uc-bm-add, #uc.uc-mc .uc-selbar .uc-btn, #uc.uc-mc .uc-crumb-btns .uc-btn {
+  background: transparent !important; color: var(--mc-white) !important; border: none !important; box-shadow: none !important; padding-left: 2px !important; padding-right: 2px !important; }
+#uc.uc-mc .uc-bm:not(.pt-rf):not(.sys-b)::before, #uc.uc-mc .uc-selbar .uc-btn::before { content: "[ "; color: var(--mc-gray); }
+#uc.uc-mc .uc-bm:not(.pt-rf):not(.sys-b)::after, #uc.uc-mc .uc-selbar .uc-btn::after { content: " ]"; color: var(--mc-gray); }
+#uc.uc-mc .uc-bm:hover, #uc.uc-mc .uc-selbar .uc-btn:hover, #uc.uc-mc .uc-crumb-btns .uc-btn:hover, #uc.uc-mc .uc-bm.on { background: var(--mc-cyan) !important; color: var(--mc-black) !important; }
+#uc.uc-mc .uc-bm.pt-seg.off { color: #8080ff !important; }
+#uc.uc-mc .uc-bm-add { color: var(--mc-gray) !important; }
+#uc.uc-mc .uc-lbl, #uc.uc-mc .uc-hidden { color: var(--mc-gray) !important; }
+#uc.uc-mc .uc-pat, #uc.uc-mc .uc-sort { background: var(--mc-cyan) !important; color: var(--mc-black) !important; border: none !important; }
+#uc.uc-mc .uc-pat::placeholder { color: #005555 !important; }
+
+/* ---------- path boxes: MC shows the path in the panel's top frame ---------- */
+#uc.uc-mc .uc-path { background: var(--mc-blue) !important; border: none !important; color: var(--mc-gray) !important; }
+#uc.uc-mc .uc-path .tr-seg, #uc.uc-mc .uc-path .tr-sep { color: var(--mc-gray) !important; }
+#uc.uc-mc .uc-path .tr-seg.ahead, #uc.uc-mc .uc-path .tr-sep.ahead { color: #6c6ccc !important; }
+#uc.uc-mc .uc-path.active { background: var(--mc-cyan) !important; }
+#uc.uc-mc .uc-path.active .tr-seg, #uc.uc-mc .uc-path.active .tr-sep { color: var(--mc-black) !important; }
+#uc.uc-mc .uc-path.active .tr-seg.ahead { color: #005a5a !important; }
+#uc.uc-mc .uc-path-btn { color: inherit !important; background: transparent !important; border: none !important; }
+#uc.uc-mc .uc-path.active .uc-path-btn { color: var(--mc-black) !important; }
+#uc.uc-mc .uc-crumb { background: var(--mc-black) !important; color: var(--mc-white) !important; border: none !important; }
+
+/* ---------- panels: blue, double light-grey frame ---------- */
+#uc.uc-mc .uc-panes { background: var(--mc-blue) !important; }
+#uc.uc-mc .uc-box, #uc.uc-mc .uc-pane.active .uc-box { background: var(--mc-blue) !important; border: 3px double var(--mc-line) !important; }
+#uc.uc-mc .uc-pane.active .uc-box { border-color: var(--mc-white) !important; }
+#uc.uc-mc .uc-pane-head, #uc.uc-mc .uc-pane.active .uc-pane-head { background: var(--mc-blue) !important; color: var(--mc-gray) !important; border-bottom: 1px solid var(--mc-line) !important; }
+#uc.uc-mc .uc-pane.active .uc-pane-head .side, #uc.uc-mc .uc-pane.active .uc-pane-head .act { background: var(--mc-cyan); color: var(--mc-black) !important; padding: 0 4px; }
+#uc.uc-mc .uc-pane-head button { background: transparent !important; color: var(--mc-white) !important; border: none !important; }
+#uc.uc-mc .uc-pane-head button:disabled { color: #6c6ccc !important; }
+/* column titles: yellow, separated by single lines */
+#uc.uc-mc .uc-cols { background: var(--mc-blue) !important; color: var(--mc-yellow) !important; border-bottom: 1px solid var(--mc-line) !important; }
+#uc.uc-mc .uc-cols > div { color: var(--mc-yellow) !important; }
+#uc.uc-mc .uc-cols > div + div, #uc.uc-mc .uc-row > div + div { box-shadow: inset 1px 0 0 var(--mc-line); }
+#uc.uc-mc .uc-colbtn { color: var(--mc-yellow) !important; background: transparent !important; border: none !important; }
+/* file rows: light grey files, white folders with MC's "/" in front */
+#uc.uc-mc .uc-list { background: var(--mc-blue) !important; }
+#uc.uc-mc .uc-row, #uc.uc-mc .uc-row > div, #uc.uc-mc .uc-row .nm:not(.dir), #uc.uc-mc .uc-row .col-size, #uc.uc-mc .uc-row .col-date, #uc.uc-mc .uc-row .col-mode, #uc.uc-mc .uc-row .col-disk {
+  color: var(--mc-gray) !important; font-family: var(--sans) !important; }
+#uc.uc-mc .uc-row { background: transparent !important; border: none !important; box-shadow: none !important; }
+#uc.uc-mc .uc-row .nm.dir { color: var(--mc-white) !important; font-weight: 700 !important; }
+#uc.uc-mc .uc-row .nm.dir:not(.up)::before { content: "/"; }
+#uc.uc-mc .uc-row .nm.link::before { content: "~"; }
+#uc.uc-mc .uc-row .nm.dir.link::before { content: "~"; }
+#uc.uc-mc .uc-row:hover { background: transparent !important; }
+#uc.uc-mc .uc-row .col-mode.odd { color: var(--mc-yellow) !important; }
+/* ticked: yellow, like MC's marked files */
+#uc.uc-mc .uc-row.sel, #uc.uc-mc .uc-row.sel > div, #uc.uc-mc .uc-row.sel .nm { color: var(--mc-yellow) !important; background: transparent !important; }
+/* the cursor: black on cyan in the active panel; none in the other (like MC) */
+#uc.uc-mc .uc-pane.active .uc-list .uc-row.cursor { background: var(--mc-cyan) !important; }
+#uc.uc-mc .uc-pane.active .uc-list .uc-row.cursor > div, #uc.uc-mc .uc-pane.active .uc-list .uc-row.cursor .nm { color: var(--mc-black) !important; }
+#uc.uc-mc .uc-pane.active .uc-list .uc-row.cursor.sel > div, #uc.uc-mc .uc-pane.active .uc-list .uc-row.cursor.sel .nm { color: var(--mc-yellow) !important; }
+#uc.uc-mc .uc-pane:not(.active) .uc-list .uc-row.cursor { background: transparent !important; }
+/* tick boxes */
+#uc.uc-mc .uc-row .box { border: 1px solid var(--mc-gray) !important; background: transparent !important; }
+#uc.uc-mc .uc-row .box.on { background: var(--mc-yellow) !important; border-color: var(--mc-yellow) !important; }
+#uc.uc-mc .uc-empty { color: var(--mc-gray) !important; }
+#uc.uc-mc .uc-pane-foot { background: var(--mc-blue) !important; color: var(--mc-gray) !important; border-top: none !important; }
+
+/* ---------- function keys: "2View" - number white on black, name black on cyan ---------- */
+#uc.uc-mc .uc-fkeys { background: var(--mc-black) !important; border-top: none !important; gap: 1px !important; }
+#uc.uc-mc .uc-fk { background: var(--mc-cyan) !important; color: var(--mc-black) !important; border: none !important; box-shadow: none !important; justify-content: flex-start !important; padding-left: 0 !important; font-weight: 400 !important; }
+#uc.uc-mc .uc-fk .k { background: var(--mc-black); color: var(--mc-gray) !important; padding: 9px 4px; margin: -7px 2px -7px 0; font-size: calc(12px * var(--fs, 1)) !important; }
+#uc.uc-mc .uc-fk .ic { color: var(--mc-black) !important; padding-left: 4px; }
+#uc.uc-mc .uc-fk.danger, #uc.uc-mc .uc-fk.primary { color: var(--mc-black) !important; background: var(--mc-cyan) !important; }
+#uc.uc-mc .uc-fk:hover, #uc.uc-mc .uc-fk:active { background: var(--mc-white) !important; }
+#uc.uc-mc .uc-fk-toggle { justify-content: center !important; padding-left: 2px !important; }
+
+/* ---------- alerts row ---------- */
+#uc.uc-mc .uc-alerts { background: var(--mc-blue) !important; color: var(--mc-yellow) !important; }
