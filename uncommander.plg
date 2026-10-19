@@ -16,7 +16,7 @@
         launch="UnCommander"
         pluginURL="&pluginURL;"
         icon="folder-open"
-        support="https://forums.unraid.net/"
+        support="https://github.com/hernandito/unCommander"
         min="6.12.0">
 
 <CHANGES>
