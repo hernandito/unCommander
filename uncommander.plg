@@ -65,7 +65,7 @@ mkdir -p /usr/local/emhttp/plugins/uncommander /boot/config/plugins/uncommander
 
 <FILE Name="&plugdir;/UnCommanderMain.page">
   <URL>&raw;/source/UnCommanderMain.page</URL>
-  <MD5>567e1188bb5d2283806b3d6fcd71205d</MD5>
+  <MD5>a197ca648565f77f4bffa8dbf74119db</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/css/mc-theme.css">
