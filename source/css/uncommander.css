@@ -601,7 +601,9 @@
 #uc .uc-cmpbar .cs.older i { background: #b9bec6; }
 #uc .uc-cmpbar .cs.same i, #uc .uc-cmpbar .cs.both i { background: transparent; border: 1.5px solid #b9bec6; width: 7px; height: 7px; }
 #uc .uc-cmpbar .cs.same, #uc .uc-cmpbar .cs.both, #uc .uc-cmpbar .cs.older, #uc .uc-cmpbar .cs.none { color: var(--muted); }
-#uc .uc-cmpbar .cb-dir { align-self: center; justify-self: center; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font: 700 calc(17px * var(--fs, 1))/1 var(--sans); }
+#uc .uc-cmpbar .cb-dir { align-self: center; justify-self: center; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font: 700 calc(19px * var(--fs, 1))/1 var(--sans); }
+#uc .uc-cmpbar .cb-dir span { display: block; line-height: 1; transform: translate(var(--cb-dx, 0px), var(--cb-dy, 0px)); }
+#uc .uc-cmpbar .cb-dir.left span { transform: translate(calc(-1 * var(--cb-dx, 0px)), calc(-1 * var(--cb-dy, 0px))) rotate(180deg); }
 #uc .uc-cmpbar .cb-foot { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; margin-top: 7px; padding: 0 2px; }
 #uc .uc-cmpbar .cb-msg { flex: 1; min-width: 0; color: var(--ink); }
 #uc .uc-cmpbar .cb-msg .muted { margin-left: 4px; }
@@ -1241,7 +1243,7 @@ body { --uc-press-bg: var(--hover-button-background); --uc-press-ink: var(--hove
  * 100% is the original look. */
 /* 2. F-keys: the small "F5" sits on the same line as "Copy" */
 #uc .uc-fk { align-items: baseline; }
-#uc .uc-fk .k, #uc .uc-fk .t { line-height: 1; }
+#uc .uc-fk .k { line-height: 1; }
 #uc .uc-fk.uc-fk-toggle { align-items: center; }
 /* 3. "Aa" (Batch rename) is real letters, not a symbol: smaller than the others */
 #uc .uc-fk .ic.txt { font-size: .78em; font-weight: 700; letter-spacing: -.02em; }

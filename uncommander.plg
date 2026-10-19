@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "uncommander">
 <!ENTITY author    "hernandito">
-<!ENTITY version   "2026.10.18e">
+<!ENTITY version   "2026.10.18g">
 <!ENTITY github    "hernandito/unCommander">
 <!ENTITY branch    "main">
 <!ENTITY raw       "https://raw.githubusercontent.com/&github;/&branch;">
@@ -20,6 +20,12 @@
         min="6.12.0">
 
 <CHANGES>
+###2026.10.18g
+- Compare bar: the direction arrow is now a heavy arrow, centred in its round button on every device.
+
+###2026.10.18f
+- Function-key bar: Copy and Move labels now line up with the other buttons and use the same weight and colour.
+
 ###2026.10.18e
 - Settings > About: link to the GitHub page and a "Buy me a coffee" button.
 
@@ -59,7 +65,7 @@ mkdir -p /usr/local/emhttp/plugins/uncommander /boot/config/plugins/uncommander
 
 <FILE Name="&plugdir;/UnCommanderMain.page">
   <URL>&raw;/source/UnCommanderMain.page</URL>
-  <MD5>a197ca648565f77f4bffa8dbf74119db</MD5>
+  <MD5>567e1188bb5d2283806b3d6fcd71205d</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/css/mc-theme.css">
@@ -69,7 +75,7 @@ mkdir -p /usr/local/emhttp/plugins/uncommander /boot/config/plugins/uncommander
 
 <FILE Name="&plugdir;/css/uncommander.css">
   <URL>&raw;/source/css/uncommander.css</URL>
-  <MD5>20469bf8525af9643199a333101a9ba1</MD5>
+  <MD5>6857155539b052c42563b58b544b7e8b</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/api.php">
@@ -114,7 +120,7 @@ mkdir -p /usr/local/emhttp/plugins/uncommander /boot/config/plugins/uncommander
 
 <FILE Name="&plugdir;/js/uncommander.js">
   <URL>&raw;/source/js/uncommander.js</URL>
-  <MD5>a6d38245e70b292a637e8e048d9db5e8</MD5>
+  <MD5>b49e8777c31260981c4c5208a2c900a3</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/scripts/apply-menu-name">

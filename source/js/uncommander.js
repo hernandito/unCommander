@@ -1582,7 +1582,7 @@
     const bar = $('.uc-cmpbar');
     bar.hidden = false;
     bar.innerHTML = `${card(panes[0])}
-      <div class="cb-dir" title="Copy direction">${src.i ? '←' : '→'}</div>
+      <div class="cb-dir${src.i ? ' left' : ''}" title="Copy direction"><span>➔</span></div>
       ${card(panes[1])}
       <div class="cb-foot">
         <div class="cb-msg">${ticked
@@ -1594,7 +1594,29 @@
       </div>`;
     $('.cb-close', bar).addEventListener('click', () => endCompare());
     $('.cb-full', bar).addEventListener('click', () => openCompareTree());
+    centerGlyph($('.cb-dir', bar));
     panes.forEach(p => { drawRows(p); queueStat(p); });
+  }
+  /* Centre a symbol's ink (not its font box) inside a round button. Fallback
+   * symbol fonts sit high or low, and differently on iPad, Windows and Linux,
+   * so measure the real glyph and shift it by the difference. */
+  function centerGlyph(box) {
+    const sp = box && box.firstElementChild; if (!sp) return;
+    try {
+      box.style.removeProperty('--cb-dx'); box.style.removeProperty('--cb-dy');
+      const cs = getComputedStyle(sp), ctx = (centerGlyph.c ||= document.createElement('canvas')).getContext('2d');
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const m = ctx.measureText(sp.textContent);
+      const mark = document.createElement('i'); mark.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+      sp.style.transform = 'none'; sp.appendChild(mark);
+      const r = sp.getBoundingClientRect(), base = mark.getBoundingClientRect().bottom;
+      mark.remove(); sp.style.transform = '';
+      const inkY = base + (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2;
+      const inkX = r.left + (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
+      const dy = (r.top + r.height / 2) - inkY, dx = (r.left + r.width / 2) - inkX;
+      if (isFinite(dy) && Math.abs(dy) < 20) box.style.setProperty('--cb-dy', dy.toFixed(2) + 'px');
+      if (isFinite(dx) && Math.abs(dx) < 20) box.style.setProperty('--cb-dx', dx.toFixed(2) + 'px');
+    } catch (e) {}
   }
   /* ---------- Detailed compare (style B): a window, subfolders included ----------
    * Lists every difference between the two panes' folders, all the way down.
