@@ -1282,3 +1282,16 @@ body { --uc-press-bg: var(--hover-button-background); --uc-press-ink: var(--hove
 #uc .st-bmc svg { width: calc(20px * var(--fs, 1)); height: calc(20px * var(--fs, 1)); fill: none; stroke: #0d0c22; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 #uc .st-bmc svg .cup { fill: #fff; }
 #uc .st-bmc svg .rim { fill: #0d0c22; }
+
+/* wrap long lines (viewer and editor) */
+#uc .wrap-pick { cursor: pointer; }
+#uc .wrap-pick input { margin: 0; accent-color: var(--accent); }
+#uc .vw.wrap .vw-l { min-width: 0; }
+#uc .vw.wrap .vw-t { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; flex: 1; }
+#uc .ed-wrap.wrap textarea.ed { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
+#uc .ed-wrap.wrap .ed-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* scroll bars always visible in the viewer and editor (some themes and browser settings make them thin or hide them) */
+#uc .vw, #uc textarea.ed { scrollbar-width: auto; scrollbar-color: color-mix(in srgb, var(--muted) 70%, transparent) transparent; }
+#uc .vw::-webkit-scrollbar, #uc textarea.ed::-webkit-scrollbar { width: 12px; height: 12px; display: block; }
+#uc .vw::-webkit-scrollbar-thumb, #uc textarea.ed::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 70%, transparent); border: 3px solid transparent; background-clip: padding-box; border-radius: 6px; }
+#uc .vw::-webkit-scrollbar-track, #uc .vw::-webkit-scrollbar-corner, #uc textarea.ed::-webkit-scrollbar-track, #uc textarea.ed::-webkit-scrollbar-corner { background: transparent; }

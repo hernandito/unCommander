@@ -63,7 +63,7 @@ try {
       $want = (string)arg('path');
       $dir = $want === '/' || $want === '' ? (uc_sys_allowed() && arg('sys', '0') === '1' ? '/' : '/mnt') : uc_path($want);
       if (!is_dir($dir)) throw new UcError("Not a folder: $dir");
-      $cmd = 'find ' . escapeshellarg($dir) . ' -mindepth 1 -maxdepth 1 -printf ' . escapeshellarg('%y\t%f\0') . ' 2>/dev/null';
+      $cmd = 'find -H ' . escapeshellarg($dir) . ' -mindepth 1 -maxdepth 1 -printf ' . escapeshellarg('%y\t%f\0') . ' 2>/dev/null';
       $raw = shell_exec($cmd) ?? '';
       $items = [];
       foreach (explode("\0", $raw) as $rec) {
@@ -138,7 +138,7 @@ try {
         if (!file_exists($q) && !is_link($q)) continue;
         $row = ['disk' => $d, 'path' => $q, 'dir' => is_dir($q), 'files' => 0, 'dirs' => 0, 'bytes' => 0, 'more' => false];
         if ($row['dir']) {
-          $h = popen('find ' . escapeshellarg($q) . ' -mindepth 1 -printf ' . escapeshellarg("%y %s\n") . ' 2>/dev/null', 'r');
+          $h = popen('find -H ' . escapeshellarg($q) . ' -mindepth 1 -printf ' . escapeshellarg("%y %s\n") . ' 2>/dev/null', 'r');
           $n = 0;
           while ($h && ($line = fgets($h)) !== false) {
             if (++$n > 50000) { $row['more'] = true; break; }
@@ -202,7 +202,7 @@ try {
       $LIMIT = 200000; $t0 = microtime(true); $cut = false;
       $walk = function (string $root) use ($LIMIT, $t0, &$cut) {
         $o = [];
-        $cmd = 'find ' . escapeshellarg($root) . ' -mindepth 1 -name ' . escapeshellarg(UC_TRASH) . ' -prune -o -printf ' . escapeshellarg('%P\0%y\0%s\0%T@\0');
+        $cmd = 'find -H ' . escapeshellarg($root) . ' -mindepth 1 -name ' . escapeshellarg(UC_TRASH) . ' -prune -o -printf ' . escapeshellarg('%P\0%y\0%s\0%T@\0');
         $h = popen($cmd . ' 2>/dev/null', 'r');
         $buf = '';
         while ($h && !feof($h)) {
@@ -481,7 +481,7 @@ try {
       }
 
       $argv = ['timeout', '120', 'find'];
-      if ($follow) $argv[] = '-L';
+      $argv[] = $follow ? '-L' : '-H';      // -H: a share that is a link (an exclusive share, like appdata on the cache) is searched too
       $argv[] = $start;
       if (!$recursive) array_push($argv, '-mindepth', '1', '-maxdepth', '1');
       array_push($argv, '(', ...$prune);
@@ -1285,7 +1285,7 @@ try {
           if ($st['tool'] === 'movies') {
             $sent = $rd[$p] ?? null;
             if ($sent && !empty($sent['dismissed'])) continue;
-            if (trim((string)shell_exec('find ' . escapeshellarg($p) . ' -regextype posix-extended -type f -iregex ' . escapeshellarg($vre) . ' ! -iname ' . escapeshellarg('*sample*') . ' -print -quit 2>/dev/null')) !== '') {
+            if (trim((string)shell_exec('find -H ' . escapeshellarg($p) . ' -regextype posix-extended -type f -iregex ' . escapeshellarg($vre) . ' ! -iname ' . escapeshellarg('*sample*') . ' -print -quit 2>/dev/null')) !== '') {
               if (!$sent || !in_array($sent['state'] ?? '', ['added', 'exists', 'removed'], true)) continue;
               $r['done'] = true; $line = json_encode($r, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
             }
@@ -1337,7 +1337,7 @@ try {
         $why = null;
         foreach ($rd as $p => $e) {
           if (isset($emitted[$p]) || isset($extra[$p]) || !empty($e['dismissed']) || !$under($p) || !in_array($e['state'] ?? '', ['added', 'exists', 'removed'], true) || !is_dir($p)) continue;
-          if (trim((string)shell_exec('find ' . escapeshellarg($p) . ' -regextype posix-extended -type f -iregex ' . escapeshellarg($vre) . ' -print -quit 2>/dev/null')) === '') continue;
+          if (trim((string)shell_exec('find -H ' . escapeshellarg($p) . ' -regextype posix-extended -type f -iregex ' . escapeshellarg($vre) . ' -print -quit 2>/dev/null')) === '') continue;
           $extra[$p] = ['title' => basename($p), 'rd' => $e];
         }
         foreach ($extra as $p => $x) {
@@ -1371,7 +1371,7 @@ try {
         elseif (realpath($p) !== $p) $why = 'path goes through a link';
         else {
           /* anything that isn't a folder, or anything hidden (file or folder), anywhere inside? */
-          $any = trim((string)shell_exec('find ' . escapeshellarg($p) . ' -mindepth 1 \\( ! -type d -o -name ' . escapeshellarg('.*') . ' \\) -print -quit 2>&1'));
+          $any = trim((string)shell_exec('find -H ' . escapeshellarg($p) . ' -mindepth 1 \\( ! -type d -o -name ' . escapeshellarg('.*') . ' \\) -print -quit 2>&1'));
           if ($any === '' && basename($p)[0] === '.') $any = $p . '/(hidden folder itself)';
           if ($any !== '') $why = 'not empty - has ' . substr($any, strlen($p) + 1) . ' inside';
         }

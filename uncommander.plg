@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "uncommander">
 <!ENTITY author    "hernandito">
-<!ENTITY version   "2026.10.18g">
+<!ENTITY version   "2026.10.18h">
 <!ENTITY github    "hernandito/unCommander">
 <!ENTITY branch    "main">
 <!ENTITY raw       "https://raw.githubusercontent.com/&github;/&branch;">
@@ -20,6 +20,10 @@
         min="6.12.0">
 
 <CHANGES>
+###2026.10.18h
+- Viewer and editor: long lines now wrap by default, so nothing is cut off at the window's edge. A Wrap checkbox (top right) turns it off, and Alt+Z switches it; with wrap off, scroll sideways with the scroll bar or Shift + mouse wheel. The scroll bars are always visible.
+- Shares kept only on the cache ("exclusive shares", usually appdata) showed as empty when opened under /mnt/user. They now open normally, and Find and folder sizes look inside them too.
+
 ###2026.10.18g
 - Compare bar: the direction arrow is now a heavy arrow, centred in its round button on every device.
 
@@ -75,42 +79,42 @@ mkdir -p /usr/local/emhttp/plugins/uncommander /boot/config/plugins/uncommander
 
 <FILE Name="&plugdir;/css/uncommander.css">
   <URL>&raw;/source/css/uncommander.css</URL>
-  <MD5>6857155539b052c42563b58b544b7e8b</MD5>
+  <MD5>1ca10a6e94f06b95ac5af95a44c9e638</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/api.php">
   <URL>&raw;/source/include/api.php</URL>
-  <MD5>9f04bceb7af8ca484dcc24cdf5bfcc7d</MD5>
+  <MD5>071692c1d117a2548105841e8bc21f85</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/emptyscan.php">
   <URL>&raw;/source/include/emptyscan.php</URL>
-  <MD5>e7b9db7c98ca29087e8b69cb789442e2</MD5>
+  <MD5>6d8361f41eb53f6b5b04032bde7bf76e</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/lib.php">
   <URL>&raw;/source/include/lib.php</URL>
-  <MD5>8d212cdf005d0fed2755bd2928fd3a0c</MD5>
+  <MD5>35b1d97aaf9d5d532bb47bb3289d2c5a</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/moviescan.php">
   <URL>&raw;/source/include/moviescan.php</URL>
-  <MD5>2a440224373b72105fd16328f6ff8b09</MD5>
+  <MD5>73cf02f8e35ad3398bb801198732a7af</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/sizer.php">
   <URL>&raw;/source/include/sizer.php</URL>
-  <MD5>6d69e28d52b20b5831a209ba2efd8740</MD5>
+  <MD5>1622cf9750d36508f4200f03d407fe49</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/tvparse.php">
   <URL>&raw;/source/include/tvparse.php</URL>
-  <MD5>cee3c9ea289d893f41397ac2f39fcd0f</MD5>
+  <MD5>dd9e09dd14b3efbc67ea51361a5897ab</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/tvscan.php">
   <URL>&raw;/source/include/tvscan.php</URL>
-  <MD5>6aaa8390326e939d47d990fb8abb8e20</MD5>
+  <MD5>89cf3fdca9dd5e487065a0c2410c18ea</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/include/worker.php">
@@ -120,7 +124,7 @@ mkdir -p /usr/local/emhttp/plugins/uncommander /boot/config/plugins/uncommander
 
 <FILE Name="&plugdir;/js/uncommander.js">
   <URL>&raw;/source/js/uncommander.js</URL>
-  <MD5>b49e8777c31260981c4c5208a2c900a3</MD5>
+  <MD5>b841a2db5c834fffbe7aaa9c544c843d</MD5>
 </FILE>
 
 <FILE Name="&plugdir;/scripts/apply-menu-name">

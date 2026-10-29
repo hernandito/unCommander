@@ -1405,6 +1405,11 @@
   const hlKey = path => { const n = base(path).toLowerCase(); return 'hl.' + (n.includes('.') ? n.split('.').pop() : n); };
   const hlLang = (path, text) => SET.highlight === false ? 'none' : store.get(hlKey(path), null) || getHL().detect(path, text);
   const hlPicker = lang => `<label class="hl-pick" title="Colour highlighting for this kind of file">Colours <select>${getHL().options(lang)}</select></label>`;
+  /* Wrap long lines (viewer and editor, remembered on this device) */
+  const wrapOn = () => store.get('wrap', true) === true;      // on unless turned off: long lines are never cut off at the window's edge
+  const wrapBox = () => `<label class="hl-pick wrap-pick" title="Wrap long lines - when off, scroll sideways (scroll bar, or Shift + mouse wheel). Alt+Z switches it."><input type="checkbox" class="wrap-cb"${wrapOn() ? ' checked' : ''}> Wrap</label>`;
+  /* Alt+Z (as in VS Code): wrap on / off */
+  const wrapKey = e => { if (e.altKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyZ' || e.key.toLowerCase() === 'z')) { e.preventDefault(); const cb = $('.wrap-cb', dlg); if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); } return true; } };
 
   /* ---------- viewer (F2) ---------- */
   /* if anything in the viewer or editor goes wrong, say so instead of doing nothing */
@@ -1434,15 +1439,16 @@
     const body = render();
     const edit = () => { openEditor(path, { line: o.line, back: o.back }); return false; };
     openDlg(base(path), `
-      <div class="vw-top"><div class="vw-meta mono">${esc(path)} · ${fmtBytes(v.size)}${v.partial ? ` · lines ${v.first.toLocaleString()}–${last.toLocaleString()}${v.more ? ' (file continues)' : ''}` : ''}</div>${o.re ? '' : hlPicker(lang)}</div>
-      <div class="vw" style="--gw:${String(last).length + 1}ch">${body}</div>`,
+      <div class="vw-top"><div class="vw-meta mono">${esc(path)} · ${fmtBytes(v.size)}${v.partial ? ` · lines ${v.first.toLocaleString()}–${last.toLocaleString()}${v.more ? ' (file continues)' : ''}` : ''}</div>${wrapBox()}${o.re ? '' : hlPicker(lang)}</div>
+      <div class="vw${wrapOn() ? ' wrap' : ''}" style="--gw:${String(last).length + 1}ch">${body}</div>`,
       [...backBtn, { label: 'Edit', run: edit }, { label: 'Close', primary: true }], 'full');
     const box = $('.vw', dlg), hit = $('.vw-l.hit', box);
     const pick = $('.hl-pick select', dlg);
     if (pick) pick.addEventListener('change', () => { lang = pick.value; store.set(hlKey(path), lang); const top = box.scrollTop; box.innerHTML = render(); box.scrollTop = top; box.focus({ preventScroll: true }); });
+    $('.wrap-cb', dlg).addEventListener('change', e => { store.set('wrap', e.target.checked); box.classList.toggle('wrap', e.target.checked); if (hit) box.scrollTop = hit.offsetTop - box.clientHeight / 3; box.focus({ preventScroll: true }); });
     if (hit) box.scrollTop = hit.offsetTop - box.clientHeight / 3;
     box.tabIndex = 0; box.focus({ preventScroll: true });
-    dlg.extraKey = e => { if (e.key === 'F3') { e.preventDefault(); edit(); } };
+    dlg.extraKey = e => { if (wrapKey(e)) return; if (e.key === 'F3') { e.preventDefault(); edit(); } };
   }
 
   /* ---------- editor (F3) ---------- */
@@ -1453,7 +1459,7 @@
     let saved = f.text, mtime = f.mtime;
     const backBtn = o.back ? [{ label: '‹ Results', run: () => { if (dlg.beforeClose && !dlg.beforeClose()) return false; dlg.beforeClose = null; o.back(); return false; } }] : [];
     openDlg(`Edit · ${base(path)}`, `
-      <div class="vw-top"><div class="vw-meta mono">${esc(path)}${SET.practice ? ' · <span class="uc-error">practice mode - look only, saving is locked</span>' : f.writable ? '' : ' · <span class="uc-error">read-only — saving will fail</span>'}${f.crlf ? ' · Windows line endings (kept)' : ''}</div>${f.text.length > HL_EDIT_MAX ? '<span class="hl-pick muted" title="Colours are switched off for very large files so typing stays fast">No colours (large file)</span>' : hlPicker(hlLang(path, f.text))}</div>
+      <div class="vw-top"><div class="vw-meta mono">${esc(path)}${SET.practice ? ' · <span class="uc-error">practice mode - look only, saving is locked</span>' : f.writable ? '' : ' · <span class="uc-error">read-only — saving will fail</span>'}${f.crlf ? ' · Windows line endings (kept)' : ''}</div>${wrapBox()}${f.text.length > HL_EDIT_MAX ? '<span class="hl-pick muted" title="Colours are switched off for very large files so typing stays fast">No colours (large file)</span>' : hlPicker(hlLang(path, f.text))}</div>
       <div class="ed-wrap"><div class="ed-hl" hidden></div><pre class="ed-pre" aria-hidden="true"></pre><textarea class="ed" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" wrap="off"></textarea></div>
       <div class="ed-status mono"><span class="ed-pos"></span><span class="ed-dirty"></span></div>`,
       [...backBtn, { label: 'Close' }, ...(SET.practice ? [] : [{ label: 'Save', primary: true, run: async () => { await save(); return false; } }])], 'full');
@@ -1462,6 +1468,13 @@
     /* colours: a <pre> drawn behind the textarea (whose own text is made
      * transparent), redrawn as you type and scrolled in step with it */
     const pre = $('.ed-pre', dlg), wrap = $('.ed-wrap', dlg);
+    /* wrapping: the coloured copy must break lines exactly where the textarea does,
+     * so it gets the same width (the textarea's scrollbar is added to its padding) */
+    const fitPre = () => { const c = getComputedStyle(ta); const sb = ta.offsetWidth - ta.clientWidth - parseFloat(c.borderLeftWidth) - parseFloat(c.borderRightWidth); pre.style.paddingRight = (parseFloat(c.paddingRight) + Math.max(0, sb)) + 'px'; };
+    const setWrap = on => { wrap.classList.toggle('wrap', on); ta.setAttribute('wrap', on ? 'soft' : 'off'); fitPre(); pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; };
+    setWrap(wrapOn());
+    $('.wrap-cb', dlg).addEventListener('change', e => { store.set('wrap', e.target.checked); setWrap(e.target.checked); $('.ed-hl', dlg).hidden = true; ta.focus({ preventScroll: true }); });
+    if (window.ResizeObserver) new ResizeObserver(() => { if (dlg.contains(ta)) fitPre(); }).observe(ta);
     let lang = f.text.length > HL_EDIT_MAX ? 'none' : hlLang(path, f.text), hlRaf = 0;
     const paint = () => {
       cancelAnimationFrame(hlRaf);
@@ -1505,13 +1518,14 @@
     ta.scrollTop = Math.max(0, ((o.line || 1) - 1) * lh - ta.clientHeight / 3);
     const hl = $('.ed-hl', dlg);
     const placeHl = () => { hl.style.top = (padTop + ((o.line || 1) - 1) * lh - ta.scrollTop) + 'px'; hl.style.height = lh + 'px'; };
-    if (o.line) {
+    if (o.line && !wrapOn()) {
       hl.hidden = false; placeHl();
       ta.addEventListener('scroll', placeHl);
       ta.addEventListener('input', () => { hl.hidden = true; ta.removeEventListener('scroll', placeHl); }, { once: true });
     }
     status();
     dlg.extraKey = e => {
+      if (wrapKey(e)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); return; }
       if (e.key === 'Tab' && e.target === ta && !e.shiftKey) { e.preventDefault(); ta.setRangeText('\t', ta.selectionStart, ta.selectionEnd, 'end'); status(); }
     };

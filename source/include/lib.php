@@ -727,7 +727,7 @@ function uc_watch_sigs(array $paths): array {
     foreach ($list as $x) $who[$x][] = $want;
   }
   if ($who) {
-    $raw = (string)shell_exec('find ' . implode(' ', array_map('escapeshellarg', array_keys($who))) . ' -maxdepth 0 -printf ' . escapeshellarg('%p\t%T@\0') . ' 2>/dev/null');
+    $raw = (string)shell_exec('find -H ' . implode(' ', array_map('escapeshellarg', array_keys($who))) . ' -maxdepth 0 -printf ' . escapeshellarg('%p\t%T@\0') . ' 2>/dev/null');
     foreach (explode("\0", $raw) as $rec) {
       $t = strrpos($rec, "\t"); if ($t === false) continue;
       $p = substr($rec, 0, $t);

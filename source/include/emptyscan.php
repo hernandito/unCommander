@@ -43,7 +43,7 @@ foreach ($st['disks'] as $k => $disk) {
    * Hidden folders (trash included) aren't walked: they just count as content. */
   /* shares left out (appdata, system...): not walked at all */
   $prune = $share === '' ? implode('', array_map(fn($n) => ' -path ' . escapeshellarg("$base/$n") . ' -prune -o', $skip)) : '';
-  $cmd = 'find ' . escapeshellarg($start) . ($share !== '' ? ' -mindepth 0' : ' -mindepth 1') . $prune
+  $cmd = 'find -H ' . escapeshellarg($start) . ($share !== '' ? ' -mindepth 0' : ' -mindepth 1') . $prune
        . ' \( -type d -name ' . escapeshellarg('.*') . ' -prune -printf ' . escapeshellarg('T\t%p\0') . ' \) -o -printf ' . escapeshellarg('%y\t%p\0') . ' 2>/dev/null';
   $h = popen($cmd, 'r');
   $buf = ''; $seen = 0; $last = 0; $found = 0; $left = 0;

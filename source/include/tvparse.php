@@ -54,7 +54,7 @@ function uc_tv_parse_ep(string $inner): array {
 /* The episodes in a show folder now (["1.5", "2.3", ...]) - dates of daily
  * shows are matched to episodes with the show's episode list ($eps). */
 function uc_tv_folder_have(string $path, array $eps, ?array &$odd = null, ?array &$info = null): array {
-  $raw = (string)shell_exec('find ' . escapeshellarg($path) . ' -mindepth 1 -name ' . escapeshellarg(UC_TRASH) . ' -prune -o -type f -printf ' . escapeshellarg('%P\t%s\0') . ' 2>/dev/null');
+  $raw = (string)shell_exec('find -H ' . escapeshellarg($path) . ' -mindepth 1 -name ' . escapeshellarg(UC_TRASH) . ' -prune -o -type f -printf ' . escapeshellarg('%P\t%s\0') . ' 2>/dev/null');
   $have = []; $dates = []; $fileOf = []; $info = ['files' => 0, 'bytes' => 0, 'extras' => 0, 'unparsed' => []];
   $list = []; foreach (explode("\0", $raw) as $e) { $t = strrpos($e, "\t"); if ($t !== false) $list[substr($e, 0, $t)] = (int)substr($e, $t + 1); }
   uksort($list, 'strnatcasecmp');

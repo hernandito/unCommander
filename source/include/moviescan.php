@@ -34,7 +34,7 @@ foreach (scandir($root) ?: [] as $n) {
 $st['total'] = count($folders); save($st);
 
 /* every file below them, in one pass */
-$h = popen('find ' . escapeshellarg($root) . ' -mindepth 2 -name ' . escapeshellarg(UC_TRASH) . ' -prune -o ! -type d -printf ' . escapeshellarg('%P\t%s\0') . ' 2>/dev/null', 'r');
+$h = popen('find -H ' . escapeshellarg($root) . ' -mindepth 2 -name ' . escapeshellarg(UC_TRASH) . ' -prune -o ! -type d -printf ' . escapeshellarg('%P\t%s\0') . ' 2>/dev/null', 'r');
 $buf = ''; $seen = 0; $last = 0;
 while ($h && !feof($h)) {
   if ($stop) break;

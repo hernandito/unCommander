@@ -31,7 +31,7 @@ foreach ($st['items'] as $i => $it) {
   $st['items'][$i]['started'] = microtime(true);
   save($st);
   /* %y type, %s apparent size in bytes, %h the folder it's in */
-  $h = popen('find ' . escapeshellarg($it['path']) . ' -printf ' . escapeshellarg("%y %s %h\n") . ' 2>/dev/null', 'r');
+  $h = popen('find -H ' . escapeshellarg($it['path']) . ' -printf ' . escapeshellarg("%y %s %h\n") . ' 2>/dev/null', 'r');
   $files = 0; $dirs = -1; $bytes = 0; $last = 0;
   while ($h && ($line = fgets($h)) !== false) {
     if ($stop) break;
