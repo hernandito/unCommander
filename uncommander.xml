@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Containers>
-<Plugin>True</Plugin>
-<PluginURL>https://raw.githubusercontent.com/hernandito/unCommander/main/uncommander.plg</PluginURL>
-<PluginAuthor>hernandito</PluginAuthor>
-<Beta>False</Beta>
-<Category>Tools:Utilities</Category>
-<Name>unCommander</Name>
-<Description>
-unCommander is a two-pane, Midnight Commander-style file manager for the unRAID web UI. Browse two folders side by side and copy, move, rename, delete, compress, extract and compare files with taps or F-keys. Copies and moves run in the background with progress, deleted files go to a restorable trash, and most actions can be undone. Includes batch renaming with live preview, a file viewer and editor, folder sizes, archives that open like folders, practice mode, an optional whole-system view, and tools to find empty folders, movie folders missing their video and TV shows with missing episodes.</Description>
-<Support>https://forums.unraid.net/topic/200949-plugin-uncommander-%E2%AD%90-a-powerful-two-pane-file-manager/</Support>
-<IconFA>folder-open</IconFA>
-<DonateImg></DonateImg>
-<DonateLink></DonateLink>
-<Screenshot>https://github.com/hernandito/unCommander/blob/main/screenshots/main-view.png?raw=true</Screenshot>
-</Containers>
+<Plugin>
+  <Name>unCommander</Name>
+  <Overview><![CDATA[Two-pane, Midnight Commander-style file manager for the Unraid web UI, with background file operations, trash and undo, batch renaming, folder comparison, and built-in maintenance tools.]]></Overview>
+  <PluginURL>https://raw.githubusercontent.com/hernandito/unCommander/main/uncommander.plg</PluginURL>
+  <PluginAuthor>hernandito</PluginAuthor>
+  <Support>https://github.com/hernandito/unCommander/issues</Support>
+  <Project>https://github.com/hernandito/unCommander</Project>
+  <ReadMe>https://raw.githubusercontent.com/hernandito/unCommander/refs/heads/main/README.md</ReadMe>
+  <Category>Tools:Utilities Tools:System</Category>
+  <MinVer>7.2.0</MinVer>
+  <Icon>https://raw.githubusercontent.com/hernandito/unCommander/refs/heads/main/assets/icon.png</Icon>
+  <License>MIT</License>
+  <Screenshot>https://raw.githubusercontent.com/hernandito/unCommander/main/screenshots/main-view.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/hernandito/unCommander/main/screenshots/batch-rename.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/hernandito/unCommander/main/screenshots/tools-empty-folders.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/hernandito/unCommander/main/screenshots/tools-tv.png</Screenshot>
+</Plugin>
+
