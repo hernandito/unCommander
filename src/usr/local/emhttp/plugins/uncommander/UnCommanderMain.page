@@ -1,0 +1,5 @@
+Menu="UnCommander:1"
+Title="unCommander"
+Markdown="false"
+---
+<?php $ucSolo = false; require '/usr/local/emhttp/plugins/uncommander/include/app.php'; ?>

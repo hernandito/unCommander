@@ -1,0 +1,18 @@
+Menu="Buttons"
+Link="uc-webapp-hook"
+---
+<?php
+/* unCommander as an iPad Home Screen app: that app has its own login, and
+ * after logging in unRAID always opens its Main page. When the page is shown
+ * inside unCommander's Home Screen app (and only there), go back to unCommander.
+ * Adds nothing to unRAID's own pages otherwise. */
+?>
+<script>
+(function () {
+  try {
+    var app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
+    if (app && localStorage.getItem('uc.webapp') === '1' && location.pathname.indexOf('/plugins/uncommander/') !== 0)
+      location.replace('/plugins/uncommander/uncommander.php');
+  } catch (e) {}
+})();
+</script>

@@ -1,0 +1,29 @@
+Menu="Utilities"
+Title="unCommander"
+Icon="uncommander.png"
+Markdown="false"
+---
+<?php
+/* Settings > User Utilities: unCommander's icon. Opens it in its own tab, or
+ * inside unRAID - handy when its top-menu entry is switched off. */
+require_once '/usr/local/emhttp/plugins/uncommander/include/lib.php';
+$ucSet = uc_settings();
+?>
+<style>
+  .ucu { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin: 18px 0; }
+  .ucu img { width: 96px; height: 96px; }
+  .ucu h2 { margin: 0 0 6px; font-size: 22px; }
+  .ucu p { margin: 0 0 14px; max-width: 640px; line-height: 1.5; }
+  .ucu .b { display: inline-block; padding: 9px 18px; margin: 0 8px 8px 0; border-radius: 6px; font-weight: 600; text-decoration: none; }
+  .ucu .b.main { background: #1f6feb; color: #fff; }
+  .ucu .b.alt { border: 1px solid #9aa3ab; color: inherit; }
+</style>
+<div class="ucu">
+  <img src="/plugins/uncommander/images/icon-192.png" alt="">
+  <div>
+    <h2>unCommander</h2>
+    <p>A two-pane file manager for your unRAID server. Open it in its own browser tab to use the whole window - on an iPad you can add that tab to the Home Screen.<?=empty($ucSet['menu_show']) ? ' Its entry in the top menu bar is switched off (unCommander Settings &gt; General).' : ''?></p>
+    <a class="b main" href="/plugins/uncommander/uncommander.php" target="_blank" rel="noopener">Open unCommander in its own tab</a>
+    <a class="b alt" href="/UnCommander">Open it here, inside unRAID</a>
+  </div>
+</div>

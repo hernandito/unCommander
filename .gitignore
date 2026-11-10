@@ -1,0 +1,7 @@
+src/usr/local/emhttp/plugins/uncommander/lib/
+src/usr/local/emhttp/plugins/uncommander/bin/
+src/usr/local/emhttp/plugins/uncommander/images/*.png
+src/usr/local/emhttp/plugins/uncommander/images/*.ico
+
+# test screenshots
+/src/**/b[0-9]*.png

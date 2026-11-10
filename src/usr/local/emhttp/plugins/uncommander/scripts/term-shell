@@ -1,0 +1,33 @@
+#!/bin/bash
+# unCommander's terminal: a login shell like unRAID's own web terminal, starting
+# in the folder of the pane that was active when it was opened.
+# Everything shown is also kept in a log in RAM, so after a page reload the new
+# terminal shows the earlier session again (scroll up to see it).
+d=$(cat /tmp/uncommander/term-cwd 2>/dev/null)
+[ -d "$d" ] || d=$HOME
+log=/tmp/uncommander/term.log
+rc=$(mktemp /tmp/uc-term-rc.XXXXXX)
+cat > "$rc" <<'RC'
+[ -f /etc/profile ] && . /etc/profile
+[ -f "$HOME/.bash_profile" ] && . "$HOME/.bash_profile"
+cd "$UC_DIR" 2>/dev/null
+rm -f "$UC_RC"
+unset UC_DIR UC_RC
+# clear pushes the screen up into the scrollback instead of wiping it - scroll up to see what was there
+clear() { printf '%*s' "${LINES:-50}" '' | tr ' ' '\n'; printf '\033[H'; }
+# every command goes into the history file straight away, so Up still finds it after a reload
+shopt -s histappend; PROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+RC
+export UC_DIR="$d" UC_RC="$rc"
+if command -v script >/dev/null 2>&1; then
+  mkdir -p /tmp/uncommander
+  # the earlier session, without its screen-clearing and full-screen-app codes
+  if [ -s "$log" ]; then
+    tail -c 300000 "$log" | sed -e '/^Script \(started\|done\) on /d' -e 's/\x1b\[[23]J//g' -e 's/\x1b\[H//g' -e 's/\x1b\[?1049[hl]//g' -e 's/\x1b\[?47[hl]//g'
+    printf '\r\n\033[2m── earlier session above · new session ──\033[0m\r\n'
+    # keep the log small: the last 300 KB
+    if [ "$(stat -c %s "$log")" -gt 2000000 ]; then tail -c 300000 "$log" > "$log.t" && mv -f "$log.t" "$log"; fi
+  fi
+  exec script -q -f -a "$log" -c "/bin/bash --rcfile '$rc' -i"
+fi
+exec /bin/bash --rcfile "$rc" -i

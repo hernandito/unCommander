@@ -1,0 +1,7 @@
+#!/bin/bash
+# unCommander's daily job (cron, 4:17): empty trash older than the setting, then
+# copy the tools' small lists to the flash drive - only if one changed since yesterday.
+D=/usr/local/emhttp/plugins/uncommander
+bash "$D/scripts/purge-trash"
+php "$D/scripts/lists-snap.php" >/dev/null 2>&1
+exit 0
