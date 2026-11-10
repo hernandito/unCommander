@@ -16,7 +16,7 @@ unCommander (uC for short) is a plugin that adds a full **Midnight Commander–s
 
 It works with a **mouse**, a **keyboard** and an **iPad**. Folders with tens of thousands of files open **instantly**. **Every change can be undone**, and nothing is ever deleted without a way back.
 
-
+[![unCommander inside unRAID](screenshots/main-view.png)](screenshots/main-view.png)
 
 Developed with assistance from Claude AI.
 
