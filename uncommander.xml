@@ -8,7 +8,7 @@
   <Project>https://github.com/hernandito/unCommander</Project>
   <ReadMe>https://raw.githubusercontent.com/hernandito/unCommander/refs/heads/main/README.md</ReadMe>
   <Category>Tools:Utilities Tools:System</Category>
-  <MinVer>7.2.0</MinVer>
+  <MinVer>6.12.0</MinVer>
   <Icon>https://raw.githubusercontent.com/hernandito/unCommander/refs/heads/main/assets/icon.png</Icon>
   <License>MIT</License>
   <Screenshot>https://raw.githubusercontent.com/hernandito/unCommander/main/screenshots/main-view.png</Screenshot>
