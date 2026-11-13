@@ -71,6 +71,8 @@ Everything unCommander (uC) can do, and how to do it. New here? The [README](../
 
 ## The screen at a glance
 
+[![unCommander inside unRAID](../screenshots/main-view.png)](../screenshots/main-view.png)
+
 From top to bottom:
 
 - **Top bar:** the **Shares | Whole OS** switch (if you turned it on), **Go to…**, the **Jump** box, and buttons for the terminal, the Tools, Movies and TV tools, History, the music player, tabs, and **Settings**.
@@ -81,6 +83,8 @@ From top to bottom:
 - **Function keys:** F2-F10 as buttons. The **›** at the end slides in a second row (Folder sizes, Compress, Extract, Batch rename, Compare, Undo).
 
 ## Opening folders and files
+
+[![Two panes, the right-click menu, Gallery preview and the terminal](../screenshots/main-view2.png)](../screenshots/main-view2.png)
 
 - **Click a name** (or press **Enter**) to open a folder or file.
 - On a tablet, **tap once** to pick the row and **tap again** to open it. Settings → General → *Tapping rows* changes this.
@@ -125,6 +129,8 @@ Just start typing while uC has the focus (or tap the **Jump** box on a tablet).
 
 ## Tabs and windows
 
+[![uC inside unRAID, in its own tab, and as an app window](../screenshots/views.png)](../screenshots/views.png)
+
 - The **tabs** button in the top bar opens a new tab with its own two panes; tabs can have names.
 - **In its own browser tab:** Settings → General has the button. uC fills the whole window, with its own tab icon.
 - **As an app window:** a minimal window with no browser bars, like a desktop file manager.
@@ -152,6 +158,8 @@ Just start typing while uC has the focus (or tap the **Jump** box on a tablet).
 
 ## Jobs: work in the background
 
+[![A copy running as a background job](../screenshots/copy-progress.png)](../screenshots/copy-progress.png)
+
 - Copies, moves, compress/extract and permission changes run as **background jobs** at low priority, one after another, so nothing fights for the disks.
 - A progress window shows the job and anything queued behind it, with **Cancel**.
 - **Continue in background**, close the tab, or even close the browser: the job carries on. When it ends you get a row at the top of uC (on every device) and an unRAID notification. Settings → General → *When a job finishes* can switch the notification off.
@@ -169,6 +177,8 @@ Just start typing while uC has the focus (or tap the **Jump** box on a tablet).
 - **Download:** right-click a file and choose Download. Several ticked items, or a folder, come down as one zip.
 
 ## Rename and batch rename
+
+[![Batch rename with a live preview](../screenshots/batch-rename.png)](../screenshots/batch-rename.png)
 
 - **F4 Rename** (F2 in the Windows/MC layout) renames the item under the cursor.
 - **Batch rename** (second F-key row, or the right-click menu) renames all the ticked items at once, four ways:
@@ -203,6 +213,8 @@ Just start typing while uC has the focus (or tap the **Jump** box on a tablet).
 - History lives in uC's own folder on the array, and forgets steps after the same number of days as the trash.
 
 ## Compare two folders
+
+[![Compare two folders](../screenshots/compare.png)](../screenshots/compare.png)
 
 1. Open a folder in each pane.
 2. Make the side you want to copy **from** active, and press **Compare** (second F-key row).
@@ -251,6 +263,8 @@ Both run as jobs with a real progress bar.
 # Looking at things
 
 ## View and Edit
+
+[![The picture viewer and the text editor](../screenshots/viewer.png)](../screenshots/viewer.png)
 
 - **F2 View** (F3 in the Windows/MC layout) shows:
   - text with line numbers and colour highlighting;
@@ -312,6 +326,8 @@ The terminal button opens unRAID's own web terminal under the panes, as wide as 
 
 ## What's using space
 
+[![What's using space](../screenshots/usage.png)](../screenshots/usage.png)
+
 A **map** and a **list** of any folder, share or disk, biggest first.
 - Start it from the Tools list (it uses the active pane's folder) or from the right-click menu of any folder.
 - Click a block or row to go inside. Colours show the kind of file: video, music, pictures, archives, other.
@@ -319,6 +335,8 @@ A **map** and a **list** of any folder, share or disk, biggest first.
 - Huge folders like appdata are fine.
 
 ## Duplicates
+
+[![Duplicates](../screenshots/duplicates.png)](../screenshots/duplicates.png)
 
 Two kinds of check:
 - **Duplicate files on different disks** - the same file on two disks, where `/mnt/user` shows only one and the other just takes space.
@@ -328,6 +346,8 @@ uC can tick for you: **Tick the hidden copies** (in every set), or **Keep one, t
 
 ## Empty folders on disks
 
+[![Empty folders on disks](../screenshots/tools-empty-folders.png)](../screenshots/tools-empty-folders.png)
+
 Finds folders with nothing at all inside on each disk and pool - usually leftovers that `/mnt/user` merges away.
 - **Leftovers** are empty folders whose same path also exists on another disk; a box also shows ones that exist on one disk only.
 - appdata, system, domains and isos are skipped by default.
@@ -335,6 +355,8 @@ Finds folders with nothing at all inside on each disk and pool - usually leftove
 - It reads every folder on the chosen disks, so sleeping disks spin up; it runs at low priority.
 
 ## Movie folders without a video
+
+[![Movie folders without a video](../screenshots/tools-movies.png)](../screenshots/tools-movies.png)
 
 Pick your movies folder (each folder directly inside is one movie). uC lists the folders with **no video**, grouped as *Posters / .nfo only*, *Empty*, *Sample only* and *Other files*.
 - **Details** shows the poster, plot, rating and IMDb/TMDb links from a local `.nfo`, plus the files inside.
@@ -345,6 +367,8 @@ Pick your movies folder (each folder directly inside is one movie). uC lists the
 **Setting up Radarr:** Settings → Tools → Radarr. Enter the address, port, optional URL base and API key, then **Test connection**. uC pairs Radarr's root folders with the same folders on this server (from the container's Docker mappings - edit if wrong), and you pick the quality profile and whether to search right away. The API key stays on the server and is never sent to the browser.
 
 ## TV shows with missing episodes
+
+[![TV shows with missing episodes](../screenshots/tools-tv.png)](../screenshots/tools-tv.png)
 
 Pick your TV folder (each folder directly inside is one show) and press Scan. Episode lists come from **TVmaze** (no account needed). Specials, extras and samples are skipped, and only episodes that aired 3 or more days ago count.
 
@@ -372,6 +396,8 @@ Finds albums with **missing covers**, **mixed formats**, **missing tracks**, and
 
 ## Colour themes and your own CSS
 
+[![Colour themes, light and dark](../screenshots/themes.png)](../screenshots/themes.png)
+
 Settings → Look & sound:
 - **Colour themes:** unCommander blue, unRAID orange, Graphite, Mono, Teal, Violet, Forest, and **Norton - an homage**. Each has light and dark colours and follows unRAID's own theme (Settings → Display Settings in unRAID).
 - **Edit any colour** with the colour picker, or save your own theme. **Undo my changes** goes back to the theme as it came.
@@ -395,6 +421,8 @@ Settings → General:
 - **Folder tree**, the **video and music player**, **tapping rows**, and whether uC is in unRAID's top menu (and under what name).
 
 ## Settings, tab by tab
+
+[![Settings](../screenshots/settings.png)](../screenshots/settings.png)
 
 | Tab | What's there |
 |---|---|
