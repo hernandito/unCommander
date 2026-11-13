@@ -26,7 +26,7 @@ Developed with assistance from Claude AI.
 
 | | |
 |---|---|
-| ↩️ **Undo anything** | Every rename, move, copy, delete and permission change goes into History. Undo any step - even days later. |
+| ↩️ **Undo anything** | Every rename, move, copy and delete goes into History. Undo any step - even days later. |
 | ⚡ **Instant on huge folders** | Tens of thousands of files open instantly - sizes and dates load only for the rows you can see. |
 | 🖱️ **Feels like a desktop app** | Right-click menus, drag and drop, Copy / Cut / Paste, upload and download - with a mouse, a keyboard or your fingers on an iPad. |
 | 🗜️ **Walk into archives** | Open a .zip, .rar, .7z, .tar.gz or .iso just like a folder - view, play and copy out, as in Midnight Commander. |
@@ -38,6 +38,8 @@ Developed with assistance from Claude AI.
 | 🛡️ **Safe by design** | A restorable trash, Practice mode, and guards that refuse to copy a disk folder onto its own share. |
 
 **Ready to try it?** Open the **Apps** tab in unRAID and search for **unCommander**. ([Install details](#-install))
+
+📖 **Want every detail?** The **[User Guide](docs/USER-GUIDE.md)** explains every feature, step by step.
 
 ---
 
@@ -61,6 +63,7 @@ Already using unCommander? This release is packed. Since the first version you'l
 
 ## 📑 Contents
 
+- 📖 **[User Guide](docs/USER-GUIDE.md)** - every feature, step by step
 - [New in 2026.11](#-new-in-202611---the-biggest-update-yet)
 - [Why unCommander](#-why-uncommander)
 - [Three ways to use it](#-three-ways-to-use-it)
@@ -85,7 +88,7 @@ Already using unCommander? This release is packed. Since the first version you'l
 
 - **Two panes, side by side.** Source on one side, destination on the other, just like Midnight Commander and Total Commander. Copying and moving is one key or one drag.
 - **Instant on huge folders.** uC reads the names first and only fetches sizes and dates for the rows you can see.
-- **Undo for everything.** Renames, moves, copies, deletes, new folders and permission changes are all recorded in History and can be undone, even days later.
+- **Undo for everything.** Renames, moves, copies, deletes and new folders are all recorded in History and can be undone, even days later.
 - **unRAID-aware.** It knows shares from disks and pools. It refuses to copy something onto itself through `/mnt/user`, shows which disk each file really lives on, finds the hidden duplicate copies that shares merge away, and mounts Unassigned Devices.
 - **Made for media libraries.** Gallery view, a picture editor, a video player that plays almost anything, a music library with a tag editor and playlists, and tools that find broken movie and TV folders and connect to Radarr, Sonarr and Lidarr.
 - **Gentle on your server.** Copies run as low-priority background jobs, and very little is ever written to the flash drive.
@@ -433,6 +436,9 @@ They go into `.uncommander-trash` at the top of their share or disk, and stay th
 
 **Is my Radarr / Sonarr / Lidarr API key safe?**
 It's kept on the server and never sent to the browser.
+
+**Where's the full manual?**
+The [User Guide](docs/USER-GUIDE.md) covers every feature and setting, with a troubleshooting section.
 
 **Something's wrong. Where do I report it?**
 In the [support thread](https://forums.unraid.net/topic/200949-plugin-uncommander-%E2%AD%90-a-powerful-two-pane-file-manager/) on the unRAID forums. Screenshots help a lot.
