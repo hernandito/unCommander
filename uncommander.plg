@@ -1,7 +1,7 @@
 <?xml version='1.0' standalone='yes'?>
 <!DOCTYPE PLUGIN [
 <!ENTITY name    "uncommander">
-<!ENTITY version "2026.11.09a">
+<!ENTITY version "2026.11.14">
 <!ENTITY plugdir "/usr/local/emhttp/plugins/uncommander">
 <!ENTITY cfgdir  "/boot/config/plugins/uncommander">
 ]>
@@ -9,6 +9,24 @@
 
 <CHANGES>
 ###&version;
+###2026.11.14
+- Profiles: save what both panes show (folders, active pane, sort, hidden files, columns, list or Gallery, open tree folders, ticks, filter, the music view and the player) under a name, and load it again from the box next to the New tab button. A dot shows when the tab has changed since. New tab, New window and the tab row's + (right-click) can start with a profile. Settings &gt; Profiles renames, reorders and removes them. Kept on the server, so every browser has them
+- The box next to the New tab button is now the profile menu (Rename this tab is in it); the Name box in the New tab panel is gone
+- Gallery view: drag the line between the panes to make the preview bigger (back to half and half outside Gallery; double-click the line for half and half). The cards keep their S/M/L size and wrap; a narrow gallery pane becomes the normal file list with your columns (dropping columns before a name is cut), while the preview stays. The gallery side keeps its width when the browser is resized. Gallery stays on in the folder you turned it on in and the folders inside it; going anywhere else goes back to the normal list. The picked card has a full accent border
+- Gallery: turning it on starts on the first picture; a folder shows a fan of the pictures inside it (poster/folder/cover first)
+- Gallery preview and picture viewer: ‹ › over the picture go through the folder's pictures; a Details tick box shows or hides the photo details; the photo details go under the picture or beside it, whichever leaves the picture bigger
+- Photo details: the picture viewer fills the window with the camera details (camera, lens, exposure, date, size, GPS with a Google Maps link) in a column on the right; the Gallery preview shows them under the picture
+- RAW photos (Fuji RAF, Nikon NEF, Canon CR2/CR3, Sony ARW, DNG, Olympus, Panasonic, Pentax, Samsung) show in the viewer and Gallery from the camera's preview inside them; right-click &gt; Save as JPG. RAW files are never changed
+- Batch rename: a Regex cheat sheet with ready-made patterns to click, tidier option boxes
+- Batch rename: finds accented letters however the file name spells them (files from a Mac often store é as e plus an accent mark), and the filter does too
+- Batch rename: save a rule under a name (Save these settings as…) and pick it again from the Saved list - kept on the server, so every browser has them. Find, Replace with, Text to add and New name remember what you renamed with recently (the ▾ in each box)
+- Link in the other pane (right-click menu): hard links - files or whole folders, checked to stay on one disk or pool - or symbolic links. Undo removes them
+- Files with more than one hard link show a link badge with the count; symbolic links show a "link" badge
+- New colour themes: Mist (soft grey, a little steel blue) and unRAID orange with a grey frame. Norton is softer and more modern (pick it again to get the new colours). Themes can give the active pane's frame its own colour (Active pane frame, in Colours)
+- Settings &gt; General: unCommander's entry in unRAID's top menu can open it in a new browser tab - with or without unRAID's menu
+- Settings &gt; About links to the User Guide; the playlist folders box says "Enter path here…"
+- Intel/AMD graphics: when unRAID lacks the VA-API drivers they need, Settings says so and videos use the CPU - no more ffmpeg crash message
+
 ###2026.11.09a
 The biggest update since the first release (full guide in the README on GitHub):
 - Undo History: every change recorded, undo any step or part of one, days later
@@ -108,6 +126,30 @@ Link="uc-webapp-hook"
   } catch (e) {}
 })();
 </script>
+<?php
+/* Settings > General > "Open in a new tab": unCommander's entry in unRAID's top menu opens it in its own
+ * browser tab (the same tab again on later clicks). Read straight from the settings file - this runs on every page. */
+$ucS = @json_decode((string)@file_get_contents('/boot/config/plugins/uncommander/settings.json'), true);
+$ucNew = ($ucS['menu_newtab'] ?? '') === true ? 'solo' : ($ucS['menu_newtab'] ?? '');
+if ($ucNew === 'solo' || $ucNew === 'unraid'): ?>
+<script>
+(function () {
+  var URL = <?=$ucNew === 'unraid' ? "'/UnCommander'" : "'/plugins/uncommander/uncommander.php'"?>, NAME = 'uncommander';
+  if (window.name === NAME) return;                      // this is unCommander's own tab: its menu entry opens it here
+  function ours(a) { var h = a && a.getAttribute('href'); return h && /^(https?:\/\/[^/]+)?\/UnCommander\/?$/.test(h) && !a.closest('#uc, .ucu'); }
+  document.addEventListener('click', function (e) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest('a'); if (!ours(a)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    var w = null;
+    try { w = window.open('', NAME); } catch (er) {}
+    if (!w) { location.href = a.getAttribute('href'); return; }            // pop-ups blocked: open it here as before
+    try { if (w.location.href === 'about:blank' || (w.location.pathname.indexOf('/plugins/uncommander/') !== 0 && !/^\/UnCommander\/?$/.test(w.location.pathname))) w.location.href = URL; } catch (er) { w.location.href = URL; }
+    try { w.focus(); } catch (er) {}
+  }, true);
+})();
+</script>
+<?php endif; ?>
 ]]></INLINE>
 </FILE>
 <FILE Name="/usr/local/emhttp/plugins/uncommander/css/uncommander.css" Mode="0644">
@@ -245,12 +287,14 @@ Link="uc-webapp-hook"
 #uc .st-radio { display: flex; gap: 10px; align-items: flex-start; padding: 2px 12px; margin-bottom: 6px; border: none; border-radius: var(--r); cursor: pointer; font-size: calc(13px * var(--fs, 1)); line-height: 1.45; }
 #uc .st-radio:has(input:checked) { background: none; }
 #uc .st-radio input { margin-top: 3px; accent-color: var(--accent); }
+#uc .st-vc-no { opacity: .8; cursor: default; }
+#uc .st-vc-why { display: block; margin-top: 2px; color: var(--muted); }
 #uc .st-vol { width: 100%; accent-color: var(--accent); }
 #uc .st-snd-grid { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; }
 #uc .uc-dlg.settings .dlg-body { max-height: 70vh; }
 
 /* panes */
-#uc .uc-panes { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr); column-gap: 8px; padding: 4px 2px 0; }
+#uc .uc-panes { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr); column-gap: 8px; padding: 4px 8px 0; }
 #uc .uc-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 #uc .uc-pane > * { flex: none; }
 /* Each pane's header, column titles and list sit in one framed box. The
@@ -260,14 +304,15 @@ Link="uc-webapp-hook"
 #uc .uc-box > * { flex: none; }
 /* both panes keep the same border widths - only the colour changes, so nothing inside moves or narrows.
  * The thicker left edge of the active pane is drawn inside, over the content, not as extra border. */
-#uc .uc-pane.active .uc-box { border-color: var(--accent); background-color: var(--pane-active-bg); }
-#uc .uc-pane.active .uc-box::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 7; pointer-events: none; }
+#uc .uc-pane.active .uc-box { border-color: var(--frame, var(--accent)); background-color: var(--pane-active-bg); }
+#uc .uc-pane.active .uc-box::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--frame, var(--accent)); z-index: 7; pointer-events: none; }
 /* Whole OS view, outside /mnt: the active pane's list gets its own tint (and the path box turns red) */
 #uc { --outside-bg: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
 #uc .uc-pane.active.uc-outside .uc-box { background-color: var(--outside-bg); }
 #uc .uc-pane-foot { display: none !important; }
 #uc .uc-pane-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 10px; background: var(--surface-2); border-bottom: 1px solid var(--line-soft); font: 600 calc(11px * var(--fs, 1))/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-#uc .uc-pane.active .uc-pane-head { background: var(--accent); color: var(--accent-ink); border-bottom-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+/* the active pane's frame and header: the accent, unless a theme gives them their own colour (--frame) */
+#uc .uc-pane.active .uc-pane-head { background: var(--frame, var(--accent)); color: var(--frame-ink, var(--accent-ink)); border-bottom-color: color-mix(in srgb, var(--frame, var(--accent)) 30%, transparent); }
 #uc .uc-cols, #uc .uc-row { display: grid; grid-template-columns: 36px minmax(0,1fr) 52px 80px 38px; align-items: center; }
 /* columns each pane shows (sliders button at the right of the column titles) */
 #uc .uc-pane .uc-cols, #uc .uc-pane .uc-row { grid-template-columns: var(--cols, 36px minmax(0,1fr) 46px 72px 34px); padding-right: 24px; }
@@ -353,6 +398,19 @@ Link="uc-webapp-hook"
 #uc .nm .up { display: inline-block; width: 13px; height: 13px; vertical-align: -2px; margin-right: 5px; fill: var(--accent); }
 #uc .uc-row .nm.dir { cursor: pointer; }
 #uc .nm.link { font-style: italic; }
+/* a file with more than one hard link */
+#uc .nl-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 1px 7px 1px 5px; border-radius: 999px; vertical-align: 1px;
+  font: 700 calc(11px * var(--fs, 1))/1.35 var(--sans, inherit); font-style: normal; white-space: nowrap;
+  color: var(--link-tag-ink, var(--accent)); background: var(--link-tag-bg, var(--accent-soft)); border: 1px solid color-mix(in srgb, var(--link-tag-ink, var(--accent)) 35%, transparent); }
+#uc .nl-tag svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#uc .nl-tag { color: #5e5e5e; background: rgba(214, 232, 255, 1); border-color: #c4c4c4; font-weight: 600; margin-top: 2px; }   /* hard link: soft blue */
+#uc .nl-tag.sym {
+  color: #5e5e5e;
+  background: rgba(255, 223, 238, 1);
+  border-color: #c4c4c4;
+  font-weight: 600;
+  margin-top: 2px;
+}
 #uc .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
 #uc .perm { font-family: var(--mono); color: var(--muted); font-size: calc(12px * var(--fs, 1)); }
 #uc .uc-row .col-date { font: 500 calc(11px * var(--fs, 1))/1 var(--sans); letter-spacing: -.01em; font-variant-numeric: tabular-nums; padding: 0 3px !important; text-overflow: clip !important; }
@@ -555,6 +613,8 @@ Link="uc-webapp-hook"
 @media (max-width: 900px) {
   #uc .st-bm { grid-template-columns: 1fr auto auto auto; }
   #uc .st-bm .st-path { grid-column: 1 / -1; grid-row: 2; }
+  #uc .st-prof { grid-template-columns: 1fr auto auto auto; }
+  #uc .st-prof .st-psub { grid-column: 1 / -1; grid-row: 2; }
   #uc .ff-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
@@ -637,6 +697,40 @@ Link="uc-webapp-hook"
 #uc .br-ex th, #uc .br-ex td { border: 1px solid var(--line-soft); padding: 5px 8px; text-align: left; vertical-align: top; }
 #uc .br-ex th { background: var(--surface); font-weight: 600; font-size: calc(11.5px * var(--fs, 1)); color: var(--ink-2); }
 #uc .br-ex td .muted { font-size: calc(11.5px * var(--fs, 1)); margin-top: 2px; }
+/* Batch rename: saved rules bar, and the "used recently" lists under the text boxes */
+#uc .br-saved { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+#uc .br-sl { font: 600 calc(11.5px * var(--fs, 1)) var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+#uc .br-pickw { position: relative; }
+#uc .br-pick { -webkit-appearance: none; appearance: none; display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 240px; max-width: 360px; margin: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font: 600 calc(13px * var(--fs, 1)) var(--sans); color: var(--ink); cursor: pointer; box-shadow: none; }
+#uc .br-pick:hover { border-color: var(--accent); }
+#uc .br-pick .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#uc .br-pick .t.ph { color: var(--muted); font-weight: 500; }
+#uc .br-pick .v, #uc .br-dd { color: var(--muted); font-size: calc(10px * var(--fs, 1)); }
+#uc .br-saveas { -webkit-appearance: none; appearance: none; margin: 0 0 0 auto; padding: 4px 2px; border: 0; background: none; box-shadow: none; font: 500 calc(13px * var(--fs, 1)) var(--sans); color: var(--accent); cursor: pointer; }
+#uc .br-saveas:hover { text-decoration: underline; }
+#uc .br-savebox { display: flex; align-items: center; gap: 8px; flex: 1; }
+#uc .br-savebox .br-sname { flex: 1; min-width: 160px; max-width: 360px; }
+#uc .br-savebox .br-sok { background: var(--accent); border-color: var(--accent); color: #fff; }
+#uc .br-saved [hidden], #uc .br-list[hidden] { display: none !important; }
+#uc .br-snote { flex-basis: 100%; color: var(--muted); font-size: calc(12px * var(--fs, 1)); }
+#uc .br-in { position: relative; }
+#uc .br-in input { width: 100%; padding-right: 34px; }
+#uc .br-dd { -webkit-appearance: none; appearance: none; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; margin: 0; padding: 0; border: 0; border-radius: 5px; background: none; box-shadow: none; cursor: pointer; }
+#uc .br-dd:hover { background: var(--accent-soft); color: var(--accent); }
+#uc .br-list { position: absolute; left: 0; top: calc(100% + 4px); z-index: 30; min-width: 100%; width: max-content; max-width: min(560px, 80vw); max-height: 300px; overflow-y: auto; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
+#uc .br-hlist { width: 100%; }
+#uc .br-list .h { padding: 6px 10px 4px; font: 600 calc(11px * var(--fs, 1)) var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+#uc .br-list .e { padding: 6px 10px 8px; color: var(--muted); font-size: calc(12.5px * var(--fs, 1)); }
+#uc .br-list .r { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: 6px; cursor: pointer; color: var(--ink); font-size: calc(13px * var(--fs, 1)); }
+#uc .br-list .r:hover, #uc .br-list .r.hl { background: var(--accent-soft); }
+#uc .br-list .r.hl { box-shadow: inset 2px 0 0 var(--accent); }
+#uc .br-list .r .n { font-weight: 600; white-space: nowrap; }
+#uc .br-list .r .s { margin-left: auto; color: var(--muted); font: calc(12px * var(--fs, 1)) var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
+#uc .br-list .r .m { font-family: var(--mono); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+#uc .br-list .r .x { -webkit-appearance: none; appearance: none; flex: none; margin: 0; padding: 2px 6px; border: 0; border-radius: 4px; background: none; box-shadow: none; color: var(--muted); cursor: pointer; }
+#uc .br-list .r .x:hover { color: var(--danger, #c0392b); background: var(--surface-2); }
+#uc .br-list .r.a { color: var(--accent); font-weight: 500; }
+#uc .br-list .sep { height: 1px; margin: 4px 0; background: var(--line-soft); }
 #uc .br-top { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
 #uc .br-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
 #uc .br-seg button { -webkit-appearance: none; appearance: none; margin: 0; border: 0; border-right: 1px solid var(--line); background: var(--surface); padding: 7px 14px; font: 500 calc(13px * var(--fs, 1)) var(--sans); color: var(--ink); cursor: pointer; min-width: 0; }
@@ -1472,9 +1566,9 @@ body { --uc-press-bg: var(--hover-button-background); --uc-press-ink: var(--hove
 #uc.uc-dark .uc-ctx { box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.5); }
 @keyframes uc-pop { from { transform: scale(.96); opacity: 0; } }
 #uc .uc-ctx[hidden], #uc .uc-ctx-veil[hidden] { display: none; }
-#uc .uc-ctx .ctx-h { display: flex; align-items: flex-start; gap: 6px; padding: 5px 12px 7px; margin-bottom: 4px; border-bottom: 1px solid var(--line-soft); font: 599 calc(12px * var(--fs, 1))/1.35 var(--sans); letter-spacing: .03em; color: var(--ink-2); }
-#uc .uc-ctx .ctx-h .dot { flex: none; font-size: calc(8px * var(--fs, 1)); line-height: calc(14px * var(--fs, 1)); }
-#uc .uc-ctx .ctx-h .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }   /* the whole name, wrapped lines kept clear of the dot */
+#uc .uc-ctx .ctx-h, #uc .uc-tabpop .ctx-h { display: flex; align-items: flex-start; gap: 6px; padding: 5px 12px 7px; margin-bottom: 4px; border-bottom: 1px solid var(--line-soft); font: 599 calc(12px * var(--fs, 1))/1.35 var(--sans); letter-spacing: .03em; color: var(--ink-2); }
+#uc .uc-ctx .ctx-h .dot, #uc .uc-tabpop .ctx-h .dot { flex: none; font-size: calc(8px * var(--fs, 1)); line-height: calc(14px * var(--fs, 1)); }
+#uc .uc-ctx .ctx-h .t, #uc .uc-tabpop .ctx-h .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }   /* the whole name, wrapped lines kept clear of the dot */
 #uc .uc-ctx button { -webkit-appearance: none !important; appearance: none !important; display: flex !important; align-items: center; gap: 10px; width: 100% !important; min-width: 0 !important; height: auto !important; margin: 0 !important; padding: 7px 12px !important; border: 0 !important; border-radius: 0 !important; background: none !important; color: var(--ink) !important; font: 400 calc(13.5px * var(--fs, 1))/1.3 var(--sans) !important; text-align: left; text-transform: none !important; letter-spacing: normal !important; text-shadow: none !important; box-shadow: none !important; cursor: pointer; white-space: nowrap; }
 #uc .uc-ctx button:hover:not(:disabled), #uc .uc-ctx button:focus-visible { background: var(--accent-soft) !important; outline: none; }
 #uc .uc-ctx button:disabled { opacity: .45; cursor: default; }
@@ -1761,7 +1855,8 @@ body { --uc-press-bg: var(--hover-button-background); --uc-press-ink: var(--hove
 #uc .uc-tile .nm.dir { color: var(--accent); font-weight: 600; }
 #uc .uc-tile .col-sel { position: absolute; top: 5px; left: 10px; border: 4px solid transparent; z-index: 2; width: auto; padding: 3px; border-radius: 4px; background: color-mix(in srgb, var(--surface) 80%, transparent); }
 #uc .uc-tile .clip-tag { position: absolute; top: 6px; right: 6px; margin: 0; z-index: 2; }
-#uc .uc-pane.gal .uc-list .uc-row.uc-tile.cursor { outline: 2px solid var(--accent); outline-offset: -2px; }
+#uc .uc-pane.gal .uc-list .uc-row.uc-tile.cursor { outline: 0; }
+#uc .uc-pane.gal .uc-list .uc-row.uc-tile.cursor::after { content: ''; position: absolute; inset: 0; border: 3px solid var(--accent); border-radius: 6px; pointer-events: none; z-index: 6; }   /* the whole card, drawn over the picture */
 #uc .uc-pane.gal .uc-list .uc-row.uc-tile.sel { background: var(--accent-soft); border-color: var(--accent); }
 #uc .uc-tile.drop-on { outline: 2px dashed var(--accent); }
 #uc .uc-box { position: relative; }
@@ -1877,10 +1972,10 @@ body { --uc-press-bg: var(--hover-button-background); --uc-press-ink: var(--hove
 /* ---------- your tweaks (beta 19) ---------- */
 #uc .st-panel:not([hidden]) ~ .st-panel:not([hidden]) { margin-top: 1px; }
 #uc .uc-ctx { border: 1px solid #b7b7b7; border-top: 6px solid #7e7e7e; padding: 0; box-shadow: 0 1px 2px rgba(16,20,24,.36), 0 10px 30px rgba(16,20,24,.36); }
-#uc .uc-ctx .ctx-h { background-color: var(--cursor); border-bottom: 1px solid #c5c5c5; }
-#uc .uc-ctx .ctx-h .t { color: var(--cursor-ink, inherit); }   /* the name on the menu's header bar: the cursor bar's text colour */
+#uc .uc-ctx .ctx-h, #uc .uc-tabpop .ctx-h { background-color: var(--cursor); border-bottom: 1px solid #c5c5c5; }
+#uc .uc-ctx .ctx-h .t, #uc .uc-tabpop .ctx-h .t { color: var(--cursor-ink, inherit); }   /* the name on the menu's header bar: the cursor bar's text colour */
 #uc.uc-dark .uc-ctx { border-color: #4a525a; border-top-color: #8a949d; box-shadow: 0 1px 2px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.55); }
-#uc.uc-dark .uc-ctx .ctx-h { border-bottom-color: #3a4148; }
+#uc.uc-dark .uc-ctx .ctx-h, #uc.uc-dark .uc-tabpop .ctx-h { border-bottom-color: #3a4148; }
 #uc .tv-legend .tv-skipall { margin-left: auto; }
 #uc .tv-legend:has(.tv-skipall) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 
@@ -2372,7 +2467,7 @@ html.uc-noselect input, html.uc-noselect textarea, html.uc-noselect #uc .uc-dlg 
 @keyframes bc-eq { from { height: 2px; } to { height: 10px; } }
 
 /* the active pane's header is the accent colour: its 'on' buttons turn the other way round */
-#uc .uc-pane.active .uc-galbtn.on, #uc .uc-pane.active .uc-musbtn.on { background: var(--accent-ink) !important; border-color: var(--accent-ink) !important; color: var(--accent) !important; }
+#uc .uc-pane.active .uc-galbtn.on, #uc .uc-pane.active .uc-musbtn.on { background: var(--frame-ink, var(--accent-ink)) !important; border-color: var(--frame-ink, var(--accent-ink)) !important; color: var(--frame, var(--accent)) !important; }
 #uc .uc-bp .bp-qb { flex: none; padding: 0 6px; font: 600 calc(11px * var(--fs, 1))/1 var(--mono); color: var(--bp-soft); white-space: nowrap; }
 #uc .bc-mkpl { -webkit-appearance: none !important; appearance: none !important; margin: 0 !important; min-width: 0 !important; height: 22px !important; padding: 0 8px !important; border: 1px solid var(--line) !important; border-radius: 5px !important; background: var(--surface) !important; color: var(--ink-2) !important; font: 500 calc(11.5px * var(--fs, 1))/1 var(--sans) !important; box-shadow: none !important; cursor: pointer; flex: none; }
 #uc .bc-mkpl:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
@@ -2761,12 +2856,17 @@ html.uc-noselect input, html.uc-noselect textarea, html.uc-noselect #uc .uc-dlg 
 
 /* ---------- New tab: the button and this tab's name ---------- */
 /* New tab: the button with the tab's name box joined to it */
-#uc .uc-tabcombo { display: inline-flex; align-items: stretch; flex: none; }
+#uc .uc-tabcombo { display: inline-flex; align-items: stretch; flex: 0 1 auto; min-width: 0; }
 #uc .uc-tabcombo[hidden] { display: none !important; }
 #uc .uc-tabcombo .uc-tabbtn { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
 #uc .uc-appbar .uc-tabname { -webkit-appearance: none; appearance: none; margin: 0 !important; min-width: 0 !important; height: auto !important; box-shadow: none !important; width: 130px; max-width: 130px; padding: 0 8px !important; border: 1px solid var(--line) !important; border-left: 0 !important; border-radius: 0 6px 6px 0 !important; background: var(--surface) !important; color: var(--ink) !important; font: 600 calc(12px * var(--fs, 1)) var(--sans, inherit); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; max-height: none; }
-#uc .uc-appbar .uc-tabname.empty { color: var(--muted) !important; font-style: italic; font-weight: 400; opacity: .75; }
-#uc .uc-appbar .uc-tabname:hover { border-color: var(--accent) !important; }
+#uc .uc-appbar .uc-tabname { display: inline-flex; align-items: center; gap: 6px; width: auto; max-width: 300px; min-width: 76px !important; flex: 0 1 auto; cursor: pointer; }   /* as wide as the name, narrower when the bar runs out of room */
+#uc .uc-tabname .tn-t { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }   /* sized by the name (Firefox sizes a flex: 1 child to nothing) */
+#uc .uc-tabname.auto .tn-t { color: var(--ink-2); font-weight: 500; }
+#uc .uc-tabname .tn-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+#uc .uc-tabname .tn-v { flex: none; font-size: calc(10px * var(--fs, 1)); color: var(--muted); }
+#uc .uc-tabname:hover .tn-v { color: var(--accent); }
+#uc .uc-appbar .uc-tabname:hover { border-color: var(--accent) !important; box-shadow: inset 1px 0 0 var(--accent) !important; }   /* the left edge too (it shares the New tab button's border) */
 /* the New tab panel */
 #uc .uc-tabpop { position: fixed; z-index: 60; width: 300px; padding: 12px; display: flex; flex-direction: column; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.22); }
 #uc .uc-tabpop[hidden] { display: none !important; }
@@ -2776,11 +2876,26 @@ html.uc-noselect input, html.uc-noselect textarea, html.uc-noselect #uc .uc-dlg 
 #uc .uc-tabpop, #uc .uc-tabpop .chk, #uc .uc-tabpop input { font-size: calc(12.5px * var(--fs, 1)); }
 #uc .tp-tip { grid-column: 1 / -1; margin-top: -4px; font-size: calc(11.5px * var(--fs, 1)); color: var(--muted); text-align: right; }
 #uc .tp-row .uc-btn:only-child { grid-column: 1 / -1; }
-#uc .tp-show { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
-#uc .tp-show .chk { grid-column: 2; justify-self: start; }
-#uc .tp-show .tp-l { grid-row: 1; }
 #uc .tp-row .tp-app { grid-column: 1 / -1; }
-#uc .tp-l { font-weight: 600; color: var(--ink-2); font-size: calc(12.5px * var(--fs, 1)); }
+/* the New tab panel: laid out like the Go to… panel - small headings, rows that light up */
+#uc .uc-tabpop { width: 320px; padding: 6px; gap: 0; }
+#uc .uc-tabpop .tp-row { padding: 4px 10px 6px; }
+#uc .uc-tabpop .tp-tip { padding: 0 10px 2px; margin: 0; }
+#uc .tp-opts { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
+#uc .tp-opt { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: var(--ink); }
+#uc .tp-opt:hover { background: var(--accent-soft); }
+#uc .tp-opt:has(input:checked) { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+#uc .tp-opt input { flex: none; margin: 0; accent-color: var(--accent); }
+#uc .tp-ot { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+#uc .tp-on { font-weight: 600; }
+#uc .tp-sub { font-family: var(--mono) !important; }
+#uc .tp-sub { color: var(--muted); font-size: calc(11.5px * var(--fs, 1)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#uc .pf-note { margin-top: 6px; color: var(--muted); font-size: calc(12px * var(--fs, 1)); }
+#uc .st-profs { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+#uc .st-prof { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(120px, 2fr) auto auto auto; gap: 6px; align-items: center; }
+#uc .st-prof .uc-btn { padding: 7px 10px; }
+#uc .st-panel .st-prof input.st-pname { font-family: var(--sans, inherit); font-weight: 600; }
+#uc .st-psub { color: var(--ink-2); font: 500 calc(12px * var(--fs, 1)) var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #uc .tp-name { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
 #uc .tp-name .tp-in { flex: 1; min-width: 0; }
 #uc .tp-in::placeholder, #uc .tn-in::placeholder { font-style: italic; color: var(--muted); opacity: .75; }
@@ -3288,6 +3403,144 @@ html.uc-noselect input, html.uc-noselect textarea, html.uc-noselect #uc .uc-dlg 
 #uc .uc-arcclose:hover { background-color: var(--accent); border-color: var(--accent); color: var(--accent-ink, #fff); }
 /* function keys that can't work inside an archive */
 #uc .uc-fk.arc-off { opacity: .38; }
+#uc .st-guide { margin-top: 8px; }
+#uc .st-guide a { font-weight: 600; }
+
+#uc .uc-tabpop { padding-top: 0; border-top: 6px solid #7e7e7e; border-radius: 8px; }   /* the New tab panel: the same frame and header bar as the menus */
+#uc .uc-tabpop .ctx-h { margin: 0 -6px 4px; }
+
+/* Batch rename options as chips: each box sits right next to its words, and a ticked one lights up */
+#uc .br-rules .radios { gap: 8px; }
+#uc .br-rules .radios .chk:has(> input[type=checkbox]), #uc .br-rules .radios .chk:has(> input[type=radio]) { gap: 7px; padding: 5px 12px 5px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); line-height: 1.2; transition: background .12s, border-color .12s; }
+#uc .br-rules .radios .chk:has(> input):hover { border-color: var(--accent); }
+#uc .br-rules .radios .chk:has(> input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+#uc .br-rules .radios .chk > input[type=checkbox], #uc .br-rules .radios .chk > input[type=radio] { margin: 0 !important; flex: none; accent-color: var(--accent); }
+/* the regex cheat sheet */
+#uc .br-rxl { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; }
+#uc .br-rxr { display: grid; grid-template-columns: auto minmax(220px, 34%) minmax(160px, 1fr) minmax(90px, 16%); gap: 12px; align-items: center; padding: 6px 8px; border-radius: 6px; }
+#uc .br-rxr:hover { background: var(--surface); }
+#uc .br-rxr .uc-btn { padding: 4px 12px; }
+#uc .br-rxr .mono { font-family: var(--mono); font-size: calc(12px * var(--fs, 1)); overflow-wrap: anywhere; }
+#uc .br-rx[hidden] { display: none; }
+@media (max-width: 760px) { #uc .br-rxr { grid-template-columns: auto 1fr; } #uc .br-rxr .mono { grid-column: 2; } }
+
+/* Picture viewer: as big as the window allows, picture on the left, the photo's details in a column on the right */
+#uc .uc-dlg.full.mv-dlg { max-width: calc(100vw - 24px); }
+#uc .uc-modal:has(.uc-dlg.mv-dlg) { padding-top: 12px; }
+#uc .mv-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 12px; height: calc(100vh - 190px); min-height: 280px; }
+#uc .mv-wrap.noside { grid-template-columns: minmax(0, 1fr); }
+#uc .mv-wrap.noside .mv-side { display: none; }
+#uc .mv-wrap .mv-stage { height: 100%; justify-content: flex-start; }
+#uc .mv-wrap .mv-stage.loading::after { left: 16px; }
+#uc .mv-side { overflow-y: auto; padding: 4px 14px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+#uc .mv-meta { align-items: center; }
+#uc .mv-tog { -webkit-appearance: none; appearance: none; margin: 0 auto 0 4px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: none; font: 500 calc(12px * var(--fs, 1)) var(--sans); color: var(--ink-2); cursor: pointer; }
+#uc .mv-tog:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 820px) {
+  #uc .mv-wrap { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  #uc .mv-side { max-height: 34vh; }
+}
+/* the details themselves (viewer column and Gallery preview) */
+#uc .ex-sec { padding: 10px 0 8px; border-bottom: 1px solid var(--line-soft); }
+#uc .ex-sec:last-child { border-bottom: 0; }
+#uc .ex-h { margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid var(--line); font: 600 calc(10.5px * var(--fs, 1))/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+#uc .ex-r { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; padding: 2px 0; font-size: calc(12.5px * var(--fs, 1)); line-height: 1.35; }
+#uc .ex-l { color: var(--muted); }
+#uc .ex-v { color: var(--ink); overflow-wrap: anywhere; }
+#uc .ex-map { display: inline-block; margin-top: 6px; font-size: calc(12.5px * var(--fs, 1)); font-weight: 600; color: var(--accent); text-decoration: none; }
+#uc .ex-map:hover { text-decoration: underline; }
+#uc .ex-none { padding: 12px 0; font-size: calc(12.5px * var(--fs, 1)); }
+/* Gallery preview: the picture as big as the pane allows; the photo's details under it or beside it
+ * (whichever leaves the picture bigger - worked out in gpLayout), only as big as they need to be */
+#uc .gp-pic { flex: 1 1 auto; min-width: 0; min-height: 0; align-self: stretch; display: flex; align-items: center; justify-content: center; }
+#uc .gp-body .gp-pic img { max-width: 100%; max-height: 100%; object-fit: contain; }
+#uc .gp-body.has-ex.ex-bottom { flex-direction: column; justify-content: flex-start; }
+#uc .gp-body.has-ex.ex-right { flex-direction: row; align-items: stretch; justify-content: flex-start; }
+#uc .gp-ex { flex: none; min-height: 0; overflow-y: auto; padding: 2px 14px 8px; border: 0; border-radius: 0; background: var(--surface); }
+#uc .gp-body.has-ex { padding: 0; gap: 0; }
+#uc .gp-body.has-ex .gp-pic { padding: 8px; }
+#uc .gp-body.ex-bottom .gp-ex { align-self: stretch; max-height: 55%; border-top: 1px solid var(--line); background-color: var(--pane-active-bg, color-mix(in srgb, var(--accent) 3%, var(--surface))); display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); column-gap: 18px; align-content: start; }
+#uc .gp-body.ex-right .gp-ex {
+  width: 300px;
+  align-self: stretch;
+  max-height: none;
+  border-left: 1px solid var(--line);
+  background-color: var(--pane-active-bg, color-mix(in srgb, var(--accent) 3%, var(--surface)));
+}
+#uc .gp-ex .ex-sec { border-bottom: 0; }
+/* the picture sits at the top left with nothing drawn around it; the see-through checks are only behind the picture itself */
+#uc .mv-wrap .mv-stage { align-items: flex-start; border: 0; border-radius: 0; background: none; }
+#uc .mv-wrap .mv-img { background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0 / 18px 18px; box-shadow: 0 0 0 1px var(--line); }
+#uc .mv-wrap .mv-stage.zoom { border: 1px solid var(--line); }
+
+/* Gallery view: drag the line between the panes to give the preview more room (only while a pane is in Gallery) */
+#uc .uc-panes { position: relative; }
+#uc .uc-splitter { display: none; position: absolute; top: 4px; bottom: 0; width: 12px; margin-left: -6px; cursor: col-resize; z-index: 20; touch-action: none; }
+#uc .uc-splitter::after { content: ''; position: absolute; left: 4px; top: calc(50% - 28px); width: 4px; height: 56px; border-radius: 2px; background: var(--line); transition: background .12s; }
+#uc .uc-splitter:hover::after, #uc .uc-splitter.drag::after { background: var(--accent); }
+@media (min-width: 701px) {
+  #uc.uc-galsplit .uc-splitter { display: block; }
+  #uc.uc-galsplit .uc-panes { grid-template-columns: minmax(0, var(--gal-left, 50%)) minmax(0, 1fr); }
+  #uc.uc-galsplit.uc-pldocked .uc-panes { grid-template-columns: minmax(0, var(--gal-left, 50%)) minmax(0, 1fr) var(--pl-dock-w); }
+  #uc.uc-galsplit .uc-crumbs { grid-template-columns: minmax(0, calc(var(--gal-left, 50%) - 44px)) auto minmax(0, 1fr); }
+}
+#uc.uc-galsplit.uc-splitting, #uc.uc-galsplit.uc-splitting * { cursor: col-resize !important; user-select: none !important; }
+/* the picture viewer takes the whole window height: the picture area grows to fill what the title, name line and buttons leave */
+#uc .uc-modal:has(.uc-dlg.mv-dlg) { padding: 10px 12px; }
+#uc .uc-dlg.full.mv-dlg { height: calc(100vh - 20px); max-height: none; }
+#uc .uc-dlg.mv-dlg .dlg-body { flex: 1 1 auto; min-height: 0; max-height: none; overflow: hidden; padding: 10px 14px 8px; gap: 8px; }
+#uc .uc-dlg.mv-dlg .mv-wrap { flex: 1 1 auto; height: auto; min-height: 0; }
+#uc .uc-dlg.mv-dlg .mv-stage { height: 100%; min-height: 0; }
+#uc .uc-dlg.mv-dlg .dlg-head { padding-top: 8px; padding-bottom: 8px; }
+
+/* Gallery while the width can be dragged: a set number of columns, so the cards shrink with the pane... */
+#uc .uc-pane.gal:not(.mus-tiles) .uc-spacer-v { grid-template-columns: repeat(auto-fill, var(--tile, 160px)); justify-content: start; }   /* cards keep their size and wrap, like icons in a file window */
+/* ...and when the pane gets very narrow, plain rows like the normal file list: tick box and name */
+#uc .uc-pane.gal.gal-rows .uc-spacer-v { grid-template-columns: minmax(0, 1fr) !important; gap: 0; padding: 0; }
+#uc .uc-pane.gal.gal-rows .uc-list .uc-row.uc-tile { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; height: var(--rowpx, var(--row)); padding: 0; border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; background: transparent; overflow: visible; }
+#uc .uc-pane.gal.gal-rows .uc-tile .tl-pic { display: none; }
+#uc .uc-pane.gal.gal-rows .uc-tile .col-sel { position: static; transform: none; border: 0; padding: 0; width: auto; height: 100%; border-radius: 0; background: none; display: flex; align-items: center; justify-content: center; }
+#uc .uc-pane.gal.gal-rows .uc-tile .nm { padding: 0 5px; text-align: left; font-size: calc(13px * var(--fs, 1)); }
+#uc .uc-pane.gal.gal-rows .uc-tile .tl-sub { display: none; }
+#uc .uc-pane.gal.gal-rows .uc-list .uc-row.uc-tile:hover { background: var(--surface-2); }
+#uc .uc-pane.gal.gal-rows .uc-list .uc-row.uc-tile.sel { background: var(--accent-soft); }
+#uc .uc-pane.gal.gal-rows .uc-list .uc-row.uc-tile.cursor { background: var(--cursor); border-bottom-color: #d7d7d7; }
+#uc .uc-pane.gal.gal-rows:not(.active) .uc-list .uc-row.uc-tile.cursor { background: var(--cursor-off); }
+#uc .uc-pane.gal.gal-rows .uc-tile.cursor::after { display: none; }
+#uc .uc-pane.gal.gal-rows .uc-galsz { display: none !important; }
+#uc .uc-pane.gal .uc-spacer-v { animation: gal-in .18s ease-out; }
+@keyframes gal-in { from { opacity: .4; } to { opacity: 1; } }
+#uc .uc-pane.gal-narrow .uc-pane-head .act { display: none; }
+#uc .uc-pane.gal-narrow .uc-pane-head { white-space: nowrap; overflow: hidden; }
+#uc .uc-pane.gal-narrow .uc-pane-head > * { min-width: 0; }
+
+/* Gallery preview: ‹ › over the picture (on hover) to go through the pictures in the folder */
+#uc .gp-pic { position: relative; }
+#uc .gp-nav { -webkit-appearance: none; appearance: none; position: absolute; top: 50%; z-index: 3; width: 44px; height: 64px; margin: -32px 0 0; padding: 0; border: 0; border-radius: 8px; background: rgba(0, 0, 0, .38); color: #fff; font: 400 34px/1 var(--sans); cursor: pointer; opacity: 0; transition: opacity .18s ease, background .15s ease; box-shadow: none; }
+#uc .gp-nav.prev { left: 14px; } #uc .gp-nav.next { right: 14px; }
+#uc .gp-pic:hover .gp-nav:not([disabled]), #uc .gp-nav:focus-visible { opacity: 1; }
+#uc .gp-nav:hover { background: rgba(0, 0, 0, .6); }
+#uc.uc-touch .gp-nav:not([disabled]) { opacity: .75; }
+#uc .gp-nav[disabled] { display: none; }
+#uc .uc-pane.gal-list .uc-galsz { display: none !important; }
+#uc .gp-body.ex-off .gp-ex { display: none; }
+#uc .gp-exchk { margin-right: 4px; font-size: calc(12px * var(--fs, 1)); color: var(--ink-2); }
+#uc .gp-exchk input { margin: 0 !important; accent-color: var(--accent); }
+/* the picture viewer: ‹ › over the picture on hover, like the Gallery preview */
+#uc .mv-stage:hover .gp-nav:not([disabled]) { opacity: 1; }
+#uc .mv-stage.zoom .gp-nav { display: none; }
+/* Gallery preview of a folder: a fan of its pictures, or of blank cards while it's read / when it has none */
+#uc { --gp-fan-w: 168px; }   /* the folder fan's width in the Gallery preview - change it in Settings > Custom CSS */
+#uc .gp-fan { position: relative; flex: none; width: min(26%, var(--gp-fan-w)); max-height: 50%; aspect-ratio: 2 / 3; margin: 2% 0 5%; }
+#uc .gp-fan .fc { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); box-shadow: 0 8px 22px rgba(0, 0, 0, .18); transform-origin: 50% 100%; transition: transform .35s cubic-bezier(.65,0,.35,1); display: grid; place-items: center; color: var(--muted); }
+#uc .gp-fan .fc0 { z-index: 3; }
+#uc .gp-fan .fc1 { z-index: 2; transform: rotate(-9deg) translateX(-16%); }
+#uc .gp-fan .fc2 { z-index: 1; transform: rotate(9deg) translateX(16%); }
+#uc .gp-fan .fc svg { width: 40%; height: 40%; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+#uc .gp-fan.loading .fc { animation: fan-pulse 1.2s ease-in-out infinite; }
+@keyframes fan-pulse { 50% { opacity: .55; } }
+#uc .gp-body:hover .gp-fan:not(.loading) .fc1 { transform: rotate(-14deg) translateX(-24%); }
+#uc .gp-body:hover .gp-fan:not(.loading) .fc2 { transform: rotate(14deg) translateX(24%); }
 ]]></INLINE>
 </FILE>
 <FILE Name="/usr/local/emhttp/plugins/uncommander/images/apple-touch-icon.png.b64" Mode="0644">
@@ -4543,6 +4796,21 @@ require_once __DIR__ . '/lib.php';
  * disk that's spinning up) would otherwise make every other request wait. */
 if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
+/* A RAW photo's preview, for the viewer and Save as JPG: the camera's own JPG from inside it */
+if (($_GET['action'] ?? '') === 'rawprev') {
+  try { $p = uc_arc_real(uc_path((string)($_GET['path'] ?? ''))); } catch (Throwable $e) { http_response_code(403); exit; }
+  if (!in_array(strtolower(pathinfo($p, PATHINFO_EXTENSION)), UC_RAW_EXT, true) || !is_file($p) || !is_readable($p)) { http_response_code(404); exit; }
+  ini_set('memory_limit', '512M');
+  $d = uc_raw_jpeg($p);
+  if ($d === null) { http_response_code(415); exit; }
+  header('Content-Type: image/jpeg');
+  header('Content-Length: ' . strlen($d));
+  header('Content-Disposition: inline; filename="' . str_replace(['"', "\r", "\n"], '', pathinfo($p, PATHINFO_FILENAME)) . '.jpg"');
+  header('X-Content-Type-Options: nosniff');
+  header('Cache-Control: private, max-age=600');
+  while (ob_get_level()) ob_end_clean();
+  echo $d; exit;
+}
 /* Raw file for the image/PDF viewer: a GET (read-only), limited to image
  * and PDF types so nothing that could run as a web page is ever served. */
 if (($_GET['action'] ?? '') === 'raw') {
@@ -4896,6 +5164,8 @@ if (($_GET['action'] ?? '') === 'thumb') {
   $ext = strtolower(pathinfo($p, PATHINFO_EXTENSION));
   $make = ['jpg' => 'imagecreatefromjpeg', 'jpeg' => 'imagecreatefromjpeg', 'png' => 'imagecreatefrompng', 'gif' => 'imagecreatefromgif',
            'webp' => 'imagecreatefromwebp', 'bmp' => 'imagecreatefrombmp', 'avif' => 'imagecreatefromavif'][$ext] ?? null;
+  $isRaw = in_array($ext, UC_RAW_EXT, true);
+  if ($isRaw) $make = 'imagecreatefromstring';
   if (!$make || !function_exists($make) || !is_file($p) || !is_readable($p)) { http_response_code(404); exit; }
   $s = max(64, min(640, (int)($_GET['s'] ?? 320)));
   $st = stat($p);
@@ -4903,13 +5173,16 @@ if (($_GET['action'] ?? '') === 'thumb') {
   $f = "$dir/" . sha1("$p|{$st['mtime']}|{$st['size']}|$s") . '.jpg';
   if (!is_file($f)) {
     @mkdir($dir, 0700, true);
-    $info = @getimagesize($p);
-    if (!$info || $info[0] * $info[1] > 80000000) { http_response_code(404); exit; }      // unreadable, or too huge to open in memory
     ini_set('memory_limit', '1536M');
-    $im = @$make($p);
+    $jd = null;
+    if ($isRaw) {                                             // a RAW photo: its camera preview
+      $jd = uc_raw_jpeg($p); $info = $jd !== null ? @getimagesizefromstring($jd) : null;
+    } else $info = @getimagesize($p);
+    if (!$info || $info[0] * $info[1] > 80000000) { http_response_code(404); exit; }      // unreadable, or too huge to open in memory
+    $im = $isRaw ? @imagecreatefromstring($jd) : @$make($p);
     if (!$im) { http_response_code(404); exit; }
-    if ($ext === 'jpg' || $ext === 'jpeg') {                 // turn it the way the camera said
-      $o = uc_jpeg_orientation($p);
+    if ($ext === 'jpg' || $ext === 'jpeg' || $isRaw) {       // turn it the way the camera said
+      $o = $isRaw ? uc_jpeg_orientation_data(substr($jd, 0, 131072)) : uc_jpeg_orientation($p); $jd = null;
       if (in_array($o, [2, 4, 5, 7], true)) imageflip($im, $o === 4 ? IMG_FLIP_VERTICAL : IMG_FLIP_HORIZONTAL);
       $deg = [3 => 180, 5 => 90, 6 => 270, 7 => 270, 8 => 90][$o] ?? 0;      // imagerotate turns anticlockwise
       if ($deg) { $r = imagerotate($im, $deg, 0); if ($r) { imagedestroy($im); $im = $r; } }
@@ -5216,7 +5489,7 @@ try {
           'g' => uc_group($s['gid']),
           'd' => $isDir,
           'l' => $isLink ? @readlink($p) : null,
-        ];
+        ] + (!$isDir && !$isLink && $s['nlink'] > 1 ? ['n' => $s['nlink']] : []);
       }
       uc_json(['stats' => $out]);
     }
@@ -5795,6 +6068,7 @@ try {
       $ff = uc_ffmpeg();
       if (!$ff) { uc_ff_start(); throw new UcError('Getting ffmpeg first (58 MB, once) - try again in a minute'); }
       $mode = arg('mode');
+      if ($mode === 'vaapi' && !uc_vaapi_libs()) uc_json(['ok' => false, 'secs' => 0, 'error' => UC_NO_VAAPI]);
       $src = '-f lavfi -i testsrc2=size=1280x720:rate=25 -t 2';
       $cmd = ['cpu' => "$src -vf format=yuv420p -c:v libx264 -preset veryfast",
               'nvidia' => "-init_hw_device cuda=gpu -filter_hw_device gpu $src -vf format=yuv420p,hwupload -c:v h264_nvenc",
@@ -6724,6 +6998,36 @@ try {
       uc_json(['ok' => true, 'settings' => uc_settings()]);
     }
 
+    /* Profiles saved or updated from the tab's name box: only the list of profiles changes */
+    case 'profiles_set': {
+      $list = json_decode((string)arg('profiles', '[]'), true);
+      $f = dirname(UC_CFG) . '/settings.json';
+      @mkdir(dirname(UC_CFG), 0777, true);
+      $lk = fopen("$f.lock", 'c'); flock($lk, LOCK_EX);
+      $s = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+      $s['profiles'] = uc_profiles_clean($list);
+      file_put_contents("$f.tmp", json_encode($s, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); rename("$f.tmp", $f);
+      flock($lk, LOCK_UN); fclose($lk);
+      uc_json(['ok' => true, 'profiles' => $s['profiles']]);
+    }
+    /* a photo's details (EXIF) for the viewer and the Gallery preview */
+    case 'photo_meta': {
+      $p = uc_arc_real(uc_path((string)arg('path')));
+      if (!is_file($p) || !is_readable($p)) throw new UcError("Can't read this file");
+      uc_json(['ok' => true] + (uc_photo_meta($p) ?: ['sections' => [], 'gps' => null]));
+    }
+    /* Batch rename's saved rules: only this key is rewritten, so nothing else in settings.json changes */
+    case 'brrules_set': {
+      $list = json_decode((string)arg('rules', '[]'), true);
+      $f = dirname(UC_CFG) . '/settings.json';
+      @mkdir(dirname(UC_CFG), 0777, true);
+      $lk = fopen("$f.lock", 'c'); flock($lk, LOCK_EX);
+      $s = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+      $s['brrules'] = uc_brrules_clean($list);
+      file_put_contents("$f.tmp", json_encode($s, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); rename("$f.tmp", $f);
+      flock($lk, LOCK_UN); fclose($lk);
+      uc_json(['ok' => true, 'rules' => $s['brrules']]);
+    }
     case 'save_settings': {
       $in = arg('settings');
       if (is_string($in)) $in = json_decode($in, true);
@@ -6750,6 +7054,9 @@ try {
         'tree' => !empty($in['tree']),
         'vplay' => !empty($in['vplay']),
         'menu_show' => !empty($in['menu_show']),
+        'menu_newtab' => in_array($in['menu_newtab'] ?? '', ['solo', 'unraid'], true) ? $in['menu_newtab'] : '',
+        'profiles' => uc_profiles_clean(array_key_exists('profiles', $in) ? $in['profiles'] : uc_settings()['profiles']),
+        'brrules' => uc_brrules_clean(array_key_exists('brrules', $in) ? $in['brrules'] : uc_settings()['brrules']),
         'palette' => uc_palette_clean($in['palette'] ?? null),
         'mythemes' => array_values(array_filter(array_map(fn($t) => is_array($t) && trim((string)($t['name'] ?? '')) !== '' ? ['name' => mb_substr(trim((string)$t['name']), 0, 40)] + uc_palette_clean($t) : null, is_array($in['mythemes'] ?? null) ? array_slice($in['mythemes'], 0, 30) : []))),
         'vsmooth' => !empty($in['vsmooth']),
@@ -6978,6 +7285,55 @@ try {
       exec('setsid nohup ' . escapeshellarg($php) . ' -d memory_limit=1024M ' . escapeshellarg(__DIR__ . '/worker.php')
            . ' ' . escapeshellarg($job['id']) . ' >/dev/null 2>&1 &');
       uc_json(['ok' => true, 'job' => $job['id'], 'moved' => $job['moved'] ?? [], 'hist' => $job['hist'] ?? null]);
+    }
+
+    /* Links in the other pane: hard links (the same file in two places, no extra space - only within one
+     * disk or pool) or symbolic links (a pointer, can go anywhere). Folders: a hard-linked copy of the
+     * folder (every file inside linked, like cp -al) or one symbolic link to the folder. Never replaces
+     * anything: a name that's already there is skipped. Undo moves the new links to the trash - the
+     * originals stay as they are. */
+    case 'link': {
+      uc_practice_block('making links');
+      $kind = arg('kind', 'hard') === 'sym' ? 'sym' : 'hard';
+      $sources = array_map('uc_path', arg_list('sources'));
+      $dest = uc_path(arg('dest'));
+      if (!$sources) throw new UcError('Nothing selected');
+      if (!is_dir($dest)) throw new UcError("The other pane isn't a folder");
+      foreach ($sources as $s) {
+        if (uc_arc_split($s) && !file_exists($s)) throw new UcError("Things inside an archive can't be linked - copy them out first");
+        if (!file_exists($s) && !is_link($s)) throw new UcError(basename($s) . ' is no longer there');
+        if (dirname($s) === $dest) throw new UcError('That is the same folder - pick a different one in the other pane');
+        if ($dest === $s || str_starts_with($dest . '/', $s . '/')) throw new UcError("Can't put a link to " . basename($s) . ' inside itself');
+      }
+      /* a hard link can't leave its disk: say so before anything is made */
+      $top = function (string $p): string { return preg_match('#^/mnt/([^/]+)#', $p, $m) ? $m[1] : '/'; };
+      if ($kind === 'hard') {
+        $ds = @stat($dest);
+        foreach ($sources as $s) {
+          $ss = @lstat($s);
+          if ($ss && $ds && $ss['dev'] !== $ds['dev']) {
+            $a = $top($s); $b = $top($dest);
+            if (($a === 'user') !== ($b === 'user')) throw new UcError("A hard link can't join /mnt/user with a single disk or pool - open both sides the same way (both in /mnt/user, or both on the disk)");
+            throw new UcError('A hard link has to stay on one disk or pool: ' . basename($s) . " is on $a, the other pane is on $b. Copy it instead, or make a symbolic link");
+          }
+        }
+      }
+      $made = []; $skipped = []; $failed = [];
+      foreach ($sources as $s) {
+        $t = uc_join($dest, basename($s));
+        if (file_exists($t) || is_link($t)) { $skipped[] = basename($s); continue; }
+        if ($kind === 'sym') { if (@symlink($s, $t)) $made[] = $t; else $failed[] = basename($s) . ': ' . (error_get_last()['message'] ?? 'not allowed'); continue; }
+        $out = [];
+        exec('cp -a -l -- ' . escapeshellarg($s) . ' ' . escapeshellarg($t) . ' 2>&1', $out, $rc);
+        if (file_exists($t) || is_link($t)) $made[] = $t;          // even half-made, so Undo can take it away
+        if ($rc !== 0) {
+          $msg = trim((string)end($out));
+          $failed[] = basename($s) . ': ' . (preg_match('/cross-device/i', $msg) ? "it's on a different disk or pool than the other pane (in /mnt/user, both have to be on the same disk)" : preg_replace('/^cp: /', '', $msg));
+        }
+      }
+      $what = count($made) === 1 ? basename($made[0]) : count($made) . ' items';
+      $hid = $made ? uc_hist_add(($kind === 'hard' ? 'Hard-linked ' : 'Made symbolic links to ') . "$what in $dest", array_map(fn($t) => ['t' => 'made', 'p' => $t], $made)) : null;
+      uc_json(['ok' => true, 'made' => array_map('basename', $made), 'skipped' => $skipped, 'failed' => $failed, 'hist' => $hid]);
     }
 
     /* ---------- Tools: background scans (read-only) ---------- */
@@ -8117,7 +8473,7 @@ $ucSet = uc_settings();
     <button class="uc-btn uc-toolbtn uc-usbtn" title="User Scripts - run your scripts from here" aria-label="User Scripts"<?=is_dir('/boot/config/plugins/user.scripts/scripts') || getenv('UC_US_DIR') ? '' : ' hidden'?>><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5l3 3v10H4z"/><path d="M9.5 1.5v3h3"/><path d="M6.3 8.2 5 9.5l1.3 1.3M9.7 8.2 11 9.5l-1.3 1.3"/></svg></button>
     <button class="uc-btn uc-toolbtn uc-histbtn" title="History - every change, newest first; undo any step, or part of one" aria-label="History"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 9.2A5.6 5.6 0 1 0 4 4.1"/><path d="M1.9 2.4v2.9h2.9"/><path d="M8 4.9v3.4l2.2 1.4"/></svg></button>
     <button class="uc-btn uc-toolbtn uc-plbtn" title="Music player - shows or hides the player at the bottom, with your playlist" aria-label="Music player"<?=($ucSet['player'] ?? true) ? '' : ' hidden'?>><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 12.2V3.4l7.6-1.7v8.6"/><ellipse cx="4.1" cy="12.3" rx="2.1" ry="1.8"/><ellipse cx="11.6" cy="10.4" rx="2.1" ry="1.8"/></svg></button>
-    <span class="uc-tabcombo"><button class="uc-btn uc-toolbtn uc-tabbtn" title="New tab or window" aria-label="New tab or window"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13M8 7.5v4M6 9.5h4"/></svg></button><button type="button" class="uc-tabname empty" title="Name this tab">tab name…</button></span>
+    <span class="uc-tabcombo"><button class="uc-btn uc-toolbtn uc-tabbtn" title="New tab or window" aria-label="New tab or window"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 5.5h13M8 7.5v4M6 9.5h4"/></svg></button><button type="button" class="uc-tabname auto" title="Profiles, and this tab&#39;s name"><span class="tn-t">unCommander</span><span class="tn-v" aria-hidden="true">▾</span></button></span>
     <div class="uc-sep"></div>
     <button class="uc-chip uc-toolpill" hidden title="Bring the tool back"></button>
     <button class="uc-chip uc-jobchip" hidden title="Copies, moves and permission changes"></button>
@@ -9316,6 +9672,54 @@ function uc_pldirs_clean($a): array {
   }
   return array_slice($out, 0, 10);
 }
+/* Profiles: a tab's whole set-up saved by name (both panes' folders, which is active, sorting,
+ * columns, list or Gallery view, the filter, hidden files) - made in the panes, kept on the server. */
+/* Batch rename's saved rules: a name and the settings of one rule (any of the four kinds) */
+function uc_brrules_clean($a) {
+  $out = []; $seen = [];
+  $t = fn($x, $n = 200) => mb_substr(str_replace("\0", '', (string)$x), 0, $n);
+  foreach (array_slice(is_array($a) ? $a : [], 0, 50) as $r) {
+    if (!is_array($r)) continue;
+    $name = trim(preg_replace('/\s+/u', ' ', $t($r['name'] ?? '', 40)));
+    if ($name === '' || isset($seen[mb_strtolower($name)])) continue;
+    $seen[mb_strtolower($name)] = 1;
+    $mode = in_array($r['mode'] ?? '', ['replace', 'add', 'number', 'case'], true) ? $r['mode'] : 'replace';
+    $out[] = ['name' => $name, 'mode' => $mode, 'find' => $t($r['find'] ?? ''), 'repl' => $t($r['repl'] ?? ''),
+      'mcase' => !empty($r['mcase']), 'first' => !empty($r['first']), 'regex' => !empty($r['regex']), 'keepExt' => !array_key_exists('keepExt', $r) || !empty($r['keepExt']),
+      'addText' => $t($r['addText'] ?? ''), 'addWhere' => ($r['addWhere'] ?? '') === 'after' ? 'after' : 'before',
+      'pattern' => $t($r['pattern'] ?? '[name] [n]'), 'start' => max(0, min(999999, (int)($r['start'] ?? 1))), 'digits' => max(1, min(9, (int)($r['digits'] ?? 2))),
+      'order' => ($r['order'] ?? '') === 'date' ? 'date' : 'name',
+      'caseTo' => in_array($r['caseTo'] ?? '', ['lower', 'upper', 'title', 'sentence'], true) ? $r['caseTo'] : 'lower'];
+  }
+  return $out;
+}
+function uc_profiles_clean($a): array {
+  $out = []; $seen = [];
+  foreach (array_slice(is_array($a) ? $a : [], 0, 50) as $p) {
+    if (!is_array($p)) continue;
+    $name = trim(preg_replace('/[\x00-\x1f]+/', ' ', mb_substr((string)($p['name'] ?? ''), 0, 40)));
+    if ($name === '' || isset($seen[mb_strtolower($name)])) continue;
+    $panes = [];
+    foreach ([0, 1] as $i) {
+      $q = (array)(($p['panes'] ?? [])[$i] ?? []);
+      $path = (string)($q['path'] ?? '');
+      if ($path === '' || $path[0] !== '/' || str_contains($path, "\0") || strlen($path) > 4096) continue 2;
+      $cols = [];
+      foreach (['size', 'disk', 'date', 'mode', 'mtime', 'perm'] as $k) if (isset($q['cols'][$k])) $cols[$k] = (bool)$q['cols'][$k];
+      /* the folder tree's open folders (paths inside the pane's folder) and the ticked names, kept small for the flash drive */
+      $str = fn($x) => is_string($x) && $x !== '' && strlen($x) <= 4096 && !str_contains($x, "\0");
+      $tree = array_values(array_filter(array_slice((array)($q['tree'] ?? []), 0, 200), fn($t) => $str($t) && str_starts_with($t, rtrim($path, '/') . '/')));
+      $sel = array_values(array_filter(array_slice((array)($q['sel'] ?? []), 0, 500), $str));
+      $cur = $str($q['cur'] ?? null) ? $q['cur'] : '';
+      $panes[] = ['path' => $path, 'gal' => !empty($q['gal']), 'cols' => $cols, 'flt' => mb_substr((string)($q['flt'] ?? ''), 0, 100), 'tree' => $tree, 'sel' => $sel, 'cur' => $cur];
+    }
+    $seen[mb_strtolower($name)] = 1;
+    $out[] = ['name' => $name, 'active' => !empty($p['active']) ? 1 : 0, 'sort' => preg_match('/^[a-z]{1,10}$/', (string)($p['sort'] ?? '')) ? $p['sort'] : 'name',
+              'rev' => !empty($p['rev']), 'hidden' => !empty($p['hidden']), 'panes' => $panes,
+              'mus' => is_string($p['mus'] ?? null) && str_starts_with($p['mus'], '/') && strlen($p['mus']) <= 4096 ? $p['mus'] : '', 'bp' => !empty($p['bp']), 'pin' => !empty($p['pin'])];
+  }
+  return $out;
+}
 function uc_settings(): array {
   $f = dirname(UC_CFG) . '/settings.json';
   $s = is_file($f) ? (json_decode(file_get_contents($f), true) ?: []) : [];
@@ -9335,7 +9739,10 @@ function uc_settings(): array {
     'tree'       => !empty($s['tree']),          // a caret opens folders in place (Settings > General)
     'palette'    => array_key_exists('palette', $s) ? uc_palette_clean($s['palette']) : (is_file($f) ? uc_palette_clean(null) : UC_PAL_DEFAULT),   // Settings > Colours (new installs: unRAID orange; upgrades from before colours keep the blue they had)
     'mythemes'   => array_values(array_filter(array_map(fn($t) => is_array($t) && trim((string)($t['name'] ?? '')) !== '' ? ['name' => mb_substr(trim((string)$t['name']), 0, 40)] + uc_palette_clean($t) : null, is_array($s['mythemes'] ?? null) ? array_slice($s['mythemes'], 0, 30) : []))),
-    'menu_show'  => !array_key_exists('menu_show', $s) || !empty($s['menu_show']),   // the entry in unRAID's top menu bar
+    'menu_show'  => !array_key_exists('menu_show', $s) || !empty($s['menu_show']),
+    'profiles'   => uc_profiles_clean($s['profiles'] ?? []),
+    'brrules'    => uc_brrules_clean($s['brrules'] ?? []),
+    'menu_newtab' => in_array($s['menu_newtab'] ?? '', ['solo', 'unraid'], true) ? $s['menu_newtab'] : (($s['menu_newtab'] ?? false) === true ? 'solo' : ''),   // the top-menu entry opens unCommander in a new browser tab: '' no, 'solo' on its own, 'unraid' with unRAID's menu   // the entry in unRAID's top menu bar
     'vplay'      => !array_key_exists('vplay', $s) || !empty($s['vplay']),       // Play any video (ffmpeg, fetched the first time a video needs it)
     'vsmooth'    => !array_key_exists('vsmooth', $s) || !empty($s['vsmooth']),   // videos always through ffmpeg (smoother from the array)
     'vconv'      => in_array($s['vconv'] ?? 'auto', ['auto', 'off', 'cpu', 'nvidia', 'vaapi'], true) ? ($s['vconv'] ?? 'auto') : 'auto',   // convert the picture: automatic = the graphics when they work
@@ -9641,9 +10048,20 @@ function uc_ff_start(): void {
   exec('setsid nohup bash -c ' . escapeshellarg($sh) . ' >/dev/null 2>&1 &');
   touch($gzf . '.part');           // counts as downloading from now on
 }
+/* Intel/AMD graphics go through VA-API: ffmpeg needs the system's libva, which stock unRAID doesn't have
+ * (without it ffmpeg stops with an assertion instead of an error). Checked once per request. */
+const UC_NO_VAAPI = "Intel/AMD graphics need the VA-API video drivers (libva), which unRAID doesn't include - use the CPU instead";
+function uc_vaapi_libs(): bool {
+  static $ok = null;
+  if ($ok !== null) return $ok;
+  foreach (['/usr/lib64', '/usr/lib', '/lib64', '/lib', '/usr/lib/x86_64-linux-gnu', '/usr/local/lib'] as $d) if (is_file("$d/libva-drm.so.2") && is_file("$d/libva.so.2")) return $ok = true;
+  exec('ldconfig -p 2>/dev/null', $l);
+  return $ok = (bool)preg_grep('/libva-drm\.so\.2\b/', $l) && (bool)preg_grep('/\blibva\.so\.2\b/', $l);
+}
 /* A 2-second test picture made with the CPU, NVIDIA or Intel/AMD graphics: does it work here? */
 function uc_gpu_try(string $mode): array {
   $ff = uc_ffmpeg(); if (!$ff) return ['ok' => false, 'error' => 'no ffmpeg', 'secs' => 0];
+  if ($mode === 'vaapi' && !uc_vaapi_libs()) return ['ok' => false, 'error' => UC_NO_VAAPI, 'secs' => 0];
   $src = '-f lavfi -i testsrc2=size=1280x720:rate=25 -t 2';
   $cmd = ['cpu' => "$src -vf format=yuv420p -c:v libx264 -preset veryfast",
           'nvidia' => "-init_hw_device cuda=gpu -filter_hw_device gpu $src -vf format=yuv420p,hwupload -c:v h264_nvenc",
@@ -9657,13 +10075,14 @@ function uc_gpu_try(string $mode): array {
  * per boot (a short test each), kept in RAM. */
 function uc_vconv(bool $fresh = false): string {
   $set = uc_settings()['vconv'];
+  if ($set === 'vaapi' && !uc_vaapi_libs()) return 'cpu';                     // picked, but it can't work here
   if (in_array($set, ['cpu', 'nvidia', 'vaapi'], true)) return $set;          // picked in Settings
   $f = UC_STATE . '/vconv';
   if ($fresh) @unlink($f);
   $m = trim((string)@file_get_contents($f));
   if (in_array($m, ['cpu', 'nvidia', 'vaapi'], true)) return $m;
   $m = 'cpu';
-  foreach (uc_gpus() as $g) if (uc_gpu_try($g['id'])['ok']) { $m = $g['id']; break; }
+  foreach (uc_gpus() as $g) if (empty($g['nolib']) && uc_gpu_try($g['id'])['ok']) { $m = $g['id']; break; }
   @mkdir(UC_STATE, 0700, true); @file_put_contents($f, $m);
   return $m;
 }
@@ -9673,7 +10092,7 @@ function uc_gpus(): array {
   if (file_exists('/dev/nvidia0') && (is_executable('/usr/bin/nvidia-smi') || is_file('/usr/lib64/libnvidia-encode.so.1') || is_file('/usr/lib/libnvidia-encode.so.1'))) $g[] = ['id' => 'nvidia', 'label' => 'NVIDIA graphics'];
   foreach (glob('/dev/dri/renderD*') ?: [] as $dev) {
     $v = trim((string)@file_get_contents('/sys/class/drm/' . basename($dev) . '/device/vendor'));
-    if ($v === '0x8086' || $v === '0x1002') { $g[] = ['id' => 'vaapi', 'dev' => $dev, 'label' => ($v === '0x8086' ? 'Intel' : 'AMD') . ' graphics']; break; }
+    if ($v === '0x8086' || $v === '0x1002') { $g[] = ['id' => 'vaapi', 'dev' => $dev, 'label' => ($v === '0x8086' ? 'Intel' : 'AMD') . ' graphics'] + (uc_vaapi_libs() ? [] : ['nolib' => true]); break; }
   }
   return $g;
 }
@@ -9721,6 +10140,8 @@ const UC_PAL_KEYS = ['accent', 'accent-soft', 'accent-ink', 'cursor', 'cursor-of
   'fk-bg', 'fk-ink', 'fk-key', 'fk-line', 'fk-danger',
   /* text boxes and path bars, path-bar hover, logo, headings, column titles, the right-click menu */
   'input-bg', 'crumb-hover', 'crumb-hover-ink', 'logo-ink', 'head-ink', 'cols-bg', 'menu-bg', 'menu-line',
+  /* the active pane's frame and header (when not set: the accent) */
+  'frame', 'frame-ink',
   /* inside an archive: the strip under the pane header and the archive in the path bar */
   'arc-bg', 'arc-line'];
 /* the colours a new install starts with: the "unRAID orange" theme (same values as THEMES.unraid in the page) */
@@ -9752,7 +10173,11 @@ function uc_palette_css(array $p): string {
 /* A JPG's "which way is up" note (EXIF Orientation, 1-8) without the exif extension. */
 function uc_jpeg_orientation(string $p): int {
   $d = @file_get_contents($p, false, null, 0, 131072);
-  if ($d === false || strlen($d) < 4 || substr($d, 0, 2) !== "\xFF\xD8") return 1;
+  return $d === false ? 1 : uc_jpeg_orientation_data($d);
+}
+/* The same from the first bytes of a JPG; 0 = the JPG has no EXIF block at all */
+function uc_jpeg_orientation_data(string $d, bool $zeroIfNone = false): int {
+  if (strlen($d) < 4 || substr($d, 0, 2) !== "\xFF\xD8") return 1;
   $o = 2;
   while ($o + 4 < strlen($d)) {
     $m = unpack('n', substr($d, $o, 2))[1]; $len = unpack('n', substr($d, $o + 2, 2))[1];
@@ -9767,7 +10192,93 @@ function uc_jpeg_orientation(string $p): int {
     if ($m === 0xFFDA || ($m & 0xFF00) !== 0xFF00) break;
     $o += 2 + $len;
   }
-  return 1;
+  return $zeroIfNone ? 0 : 1;
+}
+
+/* ---------- RAW photos ----------
+ * Browsers can't show RAW files, but nearly every camera puts a JPG preview inside them
+ * (full size on most; Fuji around 13 MP). This finds the biggest one without reading the
+ * whole file: Fuji RAF says where it is in its header; Nikon, Canon CR2, Sony, DNG, Olympus,
+ * Panasonic and Pentax keep it in TIFF directories; Canon CR3 has one in its PRVW box.
+ * Returns [offset, length, orientation] or null. Orientation is the RAW's own (TIFF-type
+ * files), for previews that don't carry their own. */
+const UC_RAW_EXT = ['raf', 'nef', 'nrw', 'cr2', 'cr3', 'arw', 'srf', 'sr2', 'dng', 'orf', 'rw2', 'pef', 'srw'];
+function uc_raw_preview(string $p): ?array {
+  $fh = @fopen($p, 'rb'); if (!$fh) return null;
+  $size = (int)@filesize($p);
+  $rd = function (int $off, int $n) use ($fh, $size): string { if ($off < 0 || $off >= $size || $n <= 0) return ''; fseek($fh, $off); return (string)fread($fh, $n); };
+  $c = []; $or = 1;
+  /* a real, viewable JPG: starts right, and isn't the lossless kind some cameras keep the raw data in */
+  $add = function (int $off, int $len) use (&$c, $rd, $size) {
+    if ($len < 4096 || $off <= 0 || $off + $len > $size) return;
+    $d = $rd($off, 65536); if (substr($d, 0, 3) !== "\xFF\xD8\xFF") return;
+    for ($o = 2; $o + 4 <= strlen($d);) {
+      if ($d[$o] !== "\xFF") return;
+      $m = ord($d[$o + 1]);
+      if ($m === 0xC3 || $m === 0xC7 || $m === 0xCB || $m === 0xCF) return;     // lossless JPG: raw data, not a picture
+      if ($m >= 0xC0 && $m <= 0xC2) break;
+      if ($m === 0xDA) break;
+      $o += 2 + unpack('n', substr($d, $o + 2, 2))[1];
+    }
+    $c[] = [$off, $len];
+  };
+  $h = $rd(0, 512);
+  if (substr($h, 0, 15) === 'FUJIFILMCCD-RAW') {
+    [, $o, $l] = unpack('N2', substr($h, 84, 8)); $add($o, $l);
+  } elseif (substr($h, 4, 8) === 'ftypcrx ') {
+    $d = $rd(0, 4 * 1048576); $at = strpos($d, 'PRVW');
+    if ($at !== false && ($j = strpos($d, "\xFF\xD8\xFF", $at)) !== false && $j - $at < 64) $add($j, unpack('N', substr($d, $j - 4, 4))[1]);
+  } elseif (in_array(substr($h, 0, 4), ["II*\0", "MM\0*", 'IIRO', 'IIRS', "IIU\0"], true)) {
+    $le = $h[0] === 'I';
+    $u16 = fn($x, $at) => unpack($le ? 'v' : 'n', substr($x, $at, 2))[1];
+    $u32 = fn($x, $at) => unpack($le ? 'V' : 'N', substr($x, $at, 4))[1];
+    $sz = [1 => 1, 2 => 1, 3 => 2, 4 => 4, 5 => 8, 6 => 1, 7 => 1, 8 => 2, 9 => 4, 10 => 8, 11 => 4, 12 => 8, 13 => 4];
+    $todo = [[$u32($h, 4), 0]]; $seen = [];
+    while ($todo && count($seen) < 64) {
+      [$ifd, $lvl] = array_shift($todo);
+      if ($ifd <= 0 || $ifd >= $size || isset($seen[$ifd])) continue;
+      $seen[$ifd] = 1;
+      $n = $u16($rd($ifd, 2) . "\0\0", 0); if ($n <= 0 || $n > 500) continue;
+      $e = $rd($ifd + 2, $n * 12 + 4); if (strlen($e) < $n * 12) continue;
+      $t = [];
+      for ($i = 0; $i < $n; $i++) {
+        $tag = $u16($e, $i * 12); $type = $u16($e, $i * 12 + 2); $cnt = $u32($e, $i * 12 + 4);
+        $inl = ($sz[$type] ?? 1) * $cnt <= 4;
+        $val = $inl ? ($type === 3 || $type === 8 ? $u16($e, $i * 12 + 8) : $u32($e, $i * 12 + 8)) : $u32($e, $i * 12 + 8);
+        $t[$tag] = [$type, $cnt, $val, $inl];
+      }
+      if ($lvl === 0 && isset($t[0x0112])) $or = (int)$t[0x0112][2] ?: 1;
+      if (isset($t[0x0201], $t[0x0202])) $add($t[0x0201][2], $t[0x0202][2]);
+      if (isset($t[0x0111], $t[0x0117]) && $t[0x0111][1] === 1 && in_array($t[0x0103][2] ?? 0, [6, 7, 99], true)) $add($t[0x0111][2], $t[0x0117][2]);
+      if (isset($t[0x002E])) $add($t[0x002E][2], $t[0x002E][1]);        // Panasonic RW2: JpgFromRaw
+      if (isset($t[0x014A])) {                                            // SubIFDs (Nikon's full-size preview lives in one)
+        [$ty, $cn, $v, $in] = $t[0x014A];
+        if ($cn === 1) $todo[] = [$v, $lvl + 1];
+        else { $l = $rd($v, min($cn, 16) * 4); for ($k = 0; $k + 4 <= strlen($l); $k += 4) $todo[] = [$u32($l, $k), $lvl + 1]; }
+      }
+      if (isset($t[0x8769])) $todo[] = [$t[0x8769][2], $lvl + 1];         // Exif
+      if ($lvl === 0 && strlen($e) >= $n * 12 + 4) $todo[] = [$u32($e, $n * 12), 0];   // the next directory (IFD1...)
+    }
+  }
+  fclose($fh);
+  if (!$c) return null;
+  usort($c, fn($a, $b) => $b[1] <=> $a[1]);
+  return [$c[0][0], $c[0][1], $or];
+}
+/* The preview JPG's bytes. If the RAW says it's turned and the preview has no EXIF of its own,
+ * a tiny EXIF block with just that is put in, so the browser shows it the right way up. */
+function uc_raw_jpeg(string $p, ?array $pv = null): ?string {
+  $pv = $pv ?? uc_raw_preview($p); if (!$pv) return null;
+  [$off, $len, $or] = $pv;
+  if ($len > 64 * 1048576) return null;
+  $d = @file_get_contents($p, false, null, $off, $len);
+  if ($d === false || strlen($d) !== $len) return null;
+  if ($or > 1 && $or <= 8 && uc_jpeg_orientation_data(substr($d, 0, 131072), true) === 0) {
+    $tiff = "MM\0*" . pack('N', 8) . pack('n', 1) . pack('nnNn', 0x0112, 3, 1, $or) . "\0\0" . pack('N', 0);
+    $app = "Exif\0\0" . $tiff;
+    $d = "\xFF\xD8\xFF\xE1" . pack('n', strlen($app) + 2) . $app . substr($d, 2);
+  }
+  return $d;
 }
 
 /* ---------- Radarr (Tools > Movie folders without a video) ----------
@@ -10859,6 +11370,115 @@ function uc_scans_tidy(): void {
   $all = glob(UC_STATE . '/scans/*.json') ?: [];
   foreach ($all as $f) { $j = json_decode((string)@file_get_contents($f), true) ?: []; $t = ($j['tool'] ?? '?') . '/' . ($j['mode'] ?? ''); if (!isset($newest[$t]) || filemtime($f) > filemtime($newest[$t])) $newest[$t] = $f; }
   foreach ($all as $f) if (!in_array($f, $newest, true) && time() - filemtime($f) > 86400) { $b = substr($f, 0, -5); foreach (['.json', '.results', '.tree', '.list', '.list.sorted'] as $x) @unlink($b . $x); foreach (glob($b . '.tree.*') ?: [] as $x) @unlink($x); }
+}
+
+/* ---------- photo details (EXIF) ----------
+ * Read without PHP's exif extension, so it works the same everywhere, and from RAW files too:
+ * JPG and HEIC/PNG/WebP (their EXIF block), Fuji RAF (the preview's EXIF), Nikon/Canon CR2/
+ * Sony/DNG/Olympus/Panasonic/Pentax/TIFF (the file's own TIFF directories), Canon CR3 (its
+ * CMT boxes). Returns sections of [label, value] rows, and the GPS position when there is one. */
+function uc_tiff_read(callable $rd, int $base, int $first, int $size): array {
+  $h = $rd($base, 8); if (strlen($h) < 8) return [];
+  $le = substr($h, 0, 2) === 'II';
+  $u16 = fn($x, $at) => unpack($le ? 'v' : 'n', substr($x, $at, 2))[1];
+  $u32 = fn($x, $at) => unpack($le ? 'V' : 'N', substr($x, $at, 4))[1];
+  $s32 = fn($x, $at) => unpack('l', $le ? substr($x, $at, 4) : strrev(substr($x, $at, 4)))[1];
+  $sz = [1 => 1, 2 => 1, 3 => 2, 4 => 4, 5 => 8, 6 => 1, 7 => 1, 8 => 2, 9 => 4, 10 => 8, 11 => 4, 12 => 8];
+  $ifd = function (int $off) use ($rd, $base, $u16, $u32, $s32, $sz, $size): array {
+    $out = [];
+    $n = strlen($c = $rd($base + $off, 2)) === 2 ? $u16($c, 0) : 0;
+    if ($n <= 0 || $n > 400) return $out;
+    $e = $rd($base + $off + 2, $n * 12);
+    for ($i = 0; $i + 12 <= strlen($e); $i += 12) {
+      $tag = $u16($e, $i); $type = $u16($e, $i + 2); $cnt = $u32($e, $i + 4);
+      $len = ($sz[$type] ?? 1) * $cnt; if ($len <= 0 || $len > 65536) continue;
+      $d = $len <= 4 ? substr($e, $i + 8, $len) : $rd($base + $u32($e, $i + 8), $len);
+      if (strlen($d) < $len) continue;
+      $vals = [];
+      for ($k = 0; $k < min($cnt, 64); $k++) {
+        $vals[] = match ($type) {
+          3, 8 => $u16($d, $k * 2), 4 => $u32($d, $k * 4), 9 => $s32($d, $k * 4),
+          5 => ($b = $u32($d, $k * 8 + 4)) ? $u32($d, $k * 8) / $b : 0.0,
+          10 => ($b = $s32($d, $k * 8 + 4)) ? $s32($d, $k * 8) / $b : 0.0,
+          default => null };
+        if ($vals[$k] === null) { $vals = null; break; }
+      }
+      $out[$tag] = $type === 2 ? trim(rtrim($d, "\0")) : ($vals === null ? $d : (count($vals) === 1 ? $vals[0] : $vals));
+    }
+    return $out;
+  };
+  $t0 = $ifd($first);
+  $ex = isset($t0[0x8769]) && is_int($t0[0x8769]) ? $ifd($t0[0x8769]) : [];
+  $gps = isset($t0[0x8825]) && is_int($t0[0x8825]) ? $ifd($t0[0x8825]) : [];
+  return ['ifd0' => $t0, 'exif' => $ex, 'gps' => $gps, 'tiff' => [$le, $u32]];
+}
+function uc_photo_meta(string $p): array {
+  $size = (int)@filesize($p); $fh = @fopen($p, 'rb'); if (!$fh) return [];
+  $frd = function (int $off, int $n) use ($fh, $size): string { if ($off < 0 || $off >= $size || $n <= 0) return ''; fseek($fh, $off); return (string)fread($fh, $n); };
+  $srd = fn(string $s) => fn(int $off, int $n): string => $off < 0 || $off >= strlen($s) ? '' : substr($s, $off, $n);
+  $h = $frd(0, 512); $T = null;
+  /* an EXIF block inside a JPG-like stream: "Exif\0\0" then a TIFF header */
+  $fromBlock = function (string $s) use ($srd) {
+    foreach (["Exif\0\0II*\0", "Exif\0\0MM\0*"] as $sig) if (($at = strpos($s, $sig)) !== false) {
+      $le = $s[$at + 6] === 'I'; $first = unpack($le ? 'V' : 'N', substr($s, $at + 10, 4))[1];
+      return uc_tiff_read($srd($s), $at + 6, $first, strlen($s));
+    }
+    return null;
+  };
+  if (substr($h, 0, 15) === 'FUJIFILMCCD-RAW') {
+    [, $o] = unpack('N', substr($h, 84, 4)); $T = $fromBlock($frd($o, 262144));
+  } elseif (substr($h, 4, 8) === 'ftypcrx ') {
+    $d = $frd(0, 1048576); $T = ['ifd0' => [], 'exif' => [], 'gps' => []];
+    foreach (['CMT1' => 'ifd0', 'CMT2' => 'exif', 'CMT4' => 'gps'] as $box => $k) if (($at = strpos($d, $box)) !== false && in_array(substr($d, $at + 4, 4), ["II*\0", "MM\0*"], true)) {
+      $le = $d[$at + 4] === 'I'; $first = unpack($le ? 'V' : 'N', substr($d, $at + 8, 4))[1];
+      $T[$k] = uc_tiff_read($srd($d), $at + 4, $first, strlen($d))['ifd0'] ?? [];
+    }
+  } elseif (in_array(substr($h, 0, 4), ["II*\0", "MM\0*", 'IIRO', 'IIRS', "IIU\0"], true)) {
+    $le = $h[0] === 'I'; $T = uc_tiff_read($frd, 0, unpack($le ? 'V' : 'N', substr($h, 4, 4))[1], $size);
+  } else {
+    $T = $fromBlock($frd(0, 2 * 1048576));                    // JPG, HEIC, PNG, WebP...
+  }
+  fclose($fh);
+  if (!$T || (!$T['ifd0'] && !$T['exif'])) return [];
+  $a = $T['ifd0'] + []; $e = $T['exif']; $g = $T['gps'];
+  $v = fn($k) => $e[$k] ?? $a[$k] ?? null;
+  $str = fn($x) => is_string($x) && $x !== '' && mb_check_encoding($x, 'UTF-8') && !preg_match('/[\x00-\x08]/', $x) ? $x : null;
+  $num = fn($x, $d = 1) => rtrim(rtrim(number_format((float)$x, $d, '.', ''), '0'), '.');
+  $date = fn($x) => is_string($x) && preg_match('/^(\d{4}):(\d\d):(\d\d) (\d\d:\d\d)(:\d\d)?/', $x, $m) ? "$m[1]-$m[2]-$m[3] $m[4]" : null;
+  $rows = function (array $r) { return array_values(array_filter($r, fn($x) => $x[1] !== null && $x[1] !== '')); };
+  $et = $v(0x829A);
+  $exp = is_numeric($et) && $et > 0 ? ($et >= 0.5 ? $num($et) . ' s' : '1/' . round(1 / $et) . ' s') : null;
+  $fn = $v(0x829D); $iso = $v(0x8827); if (is_array($iso)) $iso = $iso[0];
+  $fl = $v(0x920A); $f35 = $v(0xA405); $bias = $v(0x9204);
+  $prog = [1 => 'Manual', 2 => 'Program', 3 => 'Aperture priority', 4 => 'Shutter priority', 5 => 'Creative', 6 => 'Action', 7 => 'Portrait', 8 => 'Landscape'][$v(0x8822)] ?? null;
+  $meter = [1 => 'Average', 2 => 'Centre-weighted', 3 => 'Spot', 4 => 'Multi-spot', 5 => 'Multi-segment', 6 => 'Partial'][$v(0x9207)] ?? null;
+  $flash = is_int($v(0x9209)) ? (($v(0x9209) & 1) ? 'Fired' : 'Did not fire') : null;
+  $wb = [0 => 'Auto', 1 => 'Manual'][$v(0xA403)] ?? null;
+  $w = $v(0xA002) ?: $a[0x0100] ?? null; $hh = $v(0xA003) ?: $a[0x0101] ?? null;
+  $orient = [1 => 'Normal', 2 => 'Mirrored', 3 => 'Upside down', 4 => 'Flipped', 5 => 'Mirrored, turned', 6 => 'Turned right', 7 => 'Mirrored, turned', 8 => 'Turned left'][$a[0x0112] ?? 0] ?? null;
+  $tz = $str($v(0x9011));
+  $out = [];
+  $out[] = ['Camera', $rows([['Camera', trim(($str($a[0x010F] ?? null) ?? '') . ' ' . ($str($a[0x0110] ?? null) ?? '')) ?: null],
+    ['Lens', $str($v(0xA434))], ['Lens maker', $str($v(0xA433))], ['Body serial', $str($v(0xA431))]])];
+  $out[] = ['Exposure', $rows([['Shutter', $exp], ['Aperture', is_numeric($fn) && $fn > 0 ? 'f/' . $num($fn) : null], ['ISO', is_numeric($iso) && $iso > 0 ? (string)$iso : null],
+    ['Focal length', is_numeric($fl) && $fl > 0 ? $num($fl) . ' mm' . (is_numeric($f35) && $f35 > 0 ? " ($f35 mm full-frame)" : '') : null],
+    ['Exposure comp.', is_numeric($bias) ? ($bias > 0 ? '+' : ($bias < 0 ? '−' : '±')) . $num(abs($bias)) . ' EV' : null],
+    ['Mode', $prog], ['Metering', $meter], ['Flash', $flash], ['White balance', $wb]])];
+  $out[] = ['Picture', $rows([['Taken', ($d = $date($v(0x9003))) ? $d . ($tz ? " ($tz)" : '') : null], ['Saved', $date($a[0x0132] ?? null)],
+    ['Size', is_int($w) && is_int($hh) && $w > 0 ? "$w × $hh" . ($w * $hh >= 1e6 ? ' (' . $num($w * $hh / 1e6) . ' MP)' : '') : null], ['Orientation', $orient],
+    ['Colour space', [1 => 'sRGB', 65535 => 'Uncalibrated / Adobe RGB'][$v(0xA001)] ?? null],
+    ['Title', $str($a[0x010E] ?? null)], ['Artist', $str($a[0x013B] ?? null)], ['Copyright', $str($a[0x8298] ?? null)], ['Software', $str($a[0x0131] ?? null)]])];
+  $gps = null;
+  $deg = fn($x) => is_array($x) && count($x) >= 3 ? $x[0] + $x[1] / 60 + $x[2] / 3600 : (is_numeric($x) ? (float)$x : null);
+  if (($la = $deg($g[2] ?? null)) !== null && ($lo = $deg($g[4] ?? null)) !== null && ($la != 0 || $lo != 0)) {
+    if (strtoupper((string)($g[1] ?? 'N'))[0] === 'S') $la = -$la;
+    if (strtoupper((string)($g[3] ?? 'E'))[0] === 'W') $lo = -$lo;
+    $gps = [round($la, 6), round($lo, 6)];
+    $alt = isset($g[6]) && is_numeric($g[6]) ? (($g[5] ?? 0) === 1 ? -1 : 1) * $g[6] : null;
+    $out[] = ['Location', $rows([['Latitude', sprintf('%.5f° %s', abs($la), $la < 0 ? 'S' : 'N')], ['Longitude', sprintf('%.5f° %s', abs($lo), $lo < 0 ? 'W' : 'E')],
+      ['Altitude', $alt !== null ? round($alt) . ' m' : null]])];
+  }
+  return ['sections' => array_values(array_filter($out, fn($s) => $s[1])), 'gps' => $gps];
 }
 ]]></INLINE>
 </FILE>
@@ -11966,6 +12586,8 @@ window.UC_COVER_FONT = [
   let booting = true;          // true until both panes have loaded once
   const UP_ICON = '<svg class="up" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5 3 7.5h3.3V13.5h3.4V7.5H13z"/></svg>';
   let SET = window.UC_SETTINGS || { bookmarks: [], css: '', sounds: {}, trash_days: 7 };
+  /* profiles: named layouts (both panes' folders, views, sort...) kept on the server, so every browser has them */
+  let PROFILES = Array.isArray(SET.profiles) ? SET.profiles : [];
   const $ = (s, el = root) => el.querySelector(s);
   const $$ = (s, el = root) => Array.from(el.querySelectorAll(s));
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11993,7 +12615,7 @@ window.UC_COVER_FONT = [
     if (!okId(v) && (WIN_Q || WIN_T)) { const w = JSON.parse(localStorage.getItem('uc.win.' + (WIN_Q || WIN_T)) || 'null'); if (w && okId(w.cur)) v = w.cur; }
     if (okId(v)) TAB = v;
   } catch (e) {}
-  const TAB_KEY = /^(?:(?:path|trail|hist|fwd|sel|tree|gal)[01]|active|mus|tabname)$/;
+  const TAB_KEY = /^(?:(?:path|trail|hist|fwd|sel|tree|gal)[01]|active|mus|tabname|profile|profgo)$/;
   const tabKey = (k, id = TAB) => id !== 'main' && TAB_KEY.test(k) ? `uc.t.${id}.${k}` : 'uc.' + k;
   const store = {
     get(k, d) { try { const v = localStorage.getItem(tabKey(k)); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -12108,7 +12730,7 @@ window.UC_COVER_FONT = [
     const c = store.get('cols' + p.i, {});
     let tmpl = '36px minmax(0,1fr)';
     for (const [k, , w] of COLS) {
-      const on = colWanted(c, k) && (k !== 'disk' || userView(p));
+      const on = colWanted(c, k) && (k !== 'disk' || userView(p)) && !(p.colCut && p.colCut.has(k));   // colCut: squeezed out by a narrow Gallery list
       p.el.classList.toggle('hide-' + k, !on); if (on) tmpl += ` calc(${w} * var(--fs, 1))`;   // widths grow with the text size
     }
     p.el.style.setProperty('--cols', tmpl);
@@ -12157,7 +12779,7 @@ window.UC_COVER_FONT = [
     $('.uc-arcclose', p.el).addEventListener('click', e => { e.stopPropagation(); if (p.arc) load(p, parent(p.arc.file), base(p.arc.file)); });
     $('.uc-galbtn', p.el).addEventListener('click', e => { e.stopPropagation(); setActive(p.i); galSet(p, !p.gal); });
     $('.uc-galsz', p.el).addEventListener('click', e => { const b = e.target.closest('[data-gs]'); if (!b) return; e.stopPropagation();
-      store.set('galSize', b.dataset.gs); p.el.style.setProperty('--tile', galSize()[0] + 'px'); p.galItems = null; drawRows(p); galScroll(p); });
+      store.set('galSize', b.dataset.gs); p.el.style.setProperty('--tile', galSize()[0] + 'px'); galFit(p); p.galItems = null; drawRows(p); galScroll(p); });
     $('.uc-cancel', p.el).addEventListener('click', () => cancelLoad(p));
     $('.uc-musbtn', p.el).addEventListener('click', e => { e.stopPropagation(); setActive(p.i); mus ? musExit() : musEnter(p); });
     $('.uc-endmus', p.el).addEventListener('click', e => { e.stopPropagation(); musExit(); });
@@ -12165,7 +12787,7 @@ window.UC_COVER_FONT = [
     p.hist = store.get('hist' + p.i, []); p.fwd = store.get('fwd' + p.i, []);
     $('.uc-back', p.el).addEventListener('click', e => { e.stopPropagation(); goBack(p); });
     $('.uc-fwd', p.el).addEventListener('click', e => { e.stopPropagation(); goForward(p); });
-    p.list.addEventListener('scroll', () => { if (p.gal || p.mt) return; drawRows(p); queueStat(p); }, { passive: true });
+    p.list.addEventListener('scroll', () => { if (tilesOn(p)) return; drawRows(p); queueStat(p); }, { passive: true });
     /* Clicking a row of the other pane makes it active. Done after the click:
      * redrawing the rows on mousedown would swallow the click itself, so the
      * first click only switched panes instead of also picking the row. */
@@ -12468,8 +13090,8 @@ window.UC_COVER_FONT = [
   }
 
   function filtered(p) {
-    const f = p.flt && p.mode === 'dir' && !p.root ? p.flt.toLowerCase() : '';
-    return p.all.filter(it => (showHidden || p.mode !== 'dir' || !it.n.startsWith('.')) && (!f || base(it.n).toLowerCase().includes(f)));
+    const f = p.flt && p.mode === 'dir' && !p.root ? p.flt.normalize('NFC').toLowerCase() : '';   // NFC: é typed matches é spelled e + accent mark
+    return p.all.filter(it => (showHidden || p.mode !== 'dir' || !it.n.startsWith('.')) && (!f || base(it.n).normalize('NFC').toLowerCase().includes(f)));
   }
 
   async function applySort(p, fresh) {
@@ -12606,11 +13228,15 @@ window.UC_COVER_FONT = [
     return [Math.max(0, Math.floor(top / ROW) - 5), Math.min(p.items.length, Math.ceil((top + h) / ROW) + 5)];
   }
   function draw(p) {
-    if (p.gal && (p.mode !== 'dir' || p.root)) galSet(p, false);
+    /* Gallery stays on in the folder it was turned on in and the folders inside it; going anywhere else
+     * (up past it, Back, a shortcut, Go to…) goes back to the normal list */
+    const galHome = p.galRoot && p.path && (p.path === p.galRoot || p.path.startsWith(p.galRoot.replace(/\/$/, '') + '/'));
+    if (p.gal && (p.mode !== 'dir' || p.root || (p.galRoot && !galHome))) galSet(p, false);
     const mt = musTiles(p);
     if (mt !== !!p.mt) { p.mt = mt; p.galItems = null; p.el.classList.toggle('mus-tiles', mt); if (!p.gal) p.el.classList.toggle('gal', mt); if (mt) p.el.style.setProperty('--tile', galSize()[0] + 'px'); }
-    p.spacer.style.height = p.gal || p.mt ? '' : (p.items.length * ROW) + 'px';
+    p.spacer.style.height = tilesOn(p) ? '' : (p.items.length * ROW) + 'px';
     musBtn(p); musStrip(p); musFacts(p); udStrip(p);
+    if (p.gal && root.classList.contains('uc-galsplit')) galFit(p);   // a new folder: its names decide which list columns fit
     const gb = $('.uc-galbtn', p.el);
     if (gb) { gb.hidden = (!p.gal && !galFits(p)) || !!mus; gb.classList.toggle('on', !!p.gal); gb.title = p.gal ? 'Back to the list' : 'Gallery view - pictures as tiles; the other pane shows the one you pick'; $('.uc-galsz', p.el).hidden = !p.gal && !p.mt; }
     const n = p.items.filter(it => !it.up).length;
@@ -12633,8 +13259,11 @@ window.UC_COVER_FONT = [
     const when = m ? `${+m[2]}/${m[3]} ${m[4]}:${m[5]}` : '';
     return `<span class="bin-name">${esc(base(o))}</span><span class="bin-meta">${when ? 'deleted ' + when + ' · ' : ''}from ${esc(parent(o))}</span>`;
   }
+  /* a pane shows tiles in Gallery (unless it's narrowed to a list) and in the music library */
+  const tilesOn = p => (p.gal && !p.galList) || p.mt;
   function drawRows(p) {
-    if (p.gal || p.mt) return drawGal(p);
+    if (tilesOn(p)) return drawGal(p);
+    if (p.gal && (p.cursor !== p.galLast || p.prevPath !== p.path)) { p.galLast = p.cursor; p.prevPath = p.path; clearTimeout(p.galT); p.galT = setTimeout(() => galPreview(p), 90); }   // a Gallery narrowed to a list still feeds the preview
     const [a, b] = visibleRange(p);
     const fine = finePointer() && !p.root, tree = treeOn(p);
     const rm = recentMins(), recentCut = rm && !p.root ? (Date.now() + srvSkew - rm * 60000) / 1000 : 0;
@@ -12655,7 +13284,7 @@ window.UC_COVER_FONT = [
       const dur = p.durs && !it.up && !it.depth ? p.durs.get(it.n) : null;
       html += `<div class="${cls}" data-idx="${i}" style="top:${i * ROW}px"${!it.up && fine ? ' draggable="true"' : ''}>
         <div class="col-sel">${it.up ? '' : `<span class="box${sel ? ' on' : ''}"></span>`}</div>
-        <div class="nm col-name${isDir ? ' dir' : ''}${it.t === 'l' ? ' link' : ''}${it.up ? ' up' : ''}" title="${esc(it.n)}${s && s.l ? ' → ' + esc(s.l) : ''}">${it.up ? UP_ICON : ''}${tree && !it.up ? `<span class="tcar${isDir ? '' : ' none'}${isDir && p.tree.has(fullPath(p, it)) ? ' on' : ''}" style="margin-left:${(it.depth || 0) * 16}px"${isDir ? ' title="Show what\'s inside here"' : ''}>${isDir ? mi('chev') : ''}</span>` : ''}${it.exit ? 'Back to ' + esc(p.findInfo.start) : binLabel(p, it) || (cm ? `<span class="nm-t ${cm}">${esc(it.n)}</span>` : esc(it.n))}${cs && CMP_TAG[cs] ? `<span class="cmp-tag ${cs}">${CMP_TAG[cs]}</span>` : ''}${cm ? `<span class="clip-tag ${cm}">${cm === 'cut' ? '✂ cut' : cm === 'del' ? '🗑 to delete' : '⧉ copy'}</span>` : ''}${dur ? `<span class="mus-len">${fmtT(dur)}</span>` : ''}${p.ud && p.udMap ? udCell(p, it) : ''}</div>
+        <div class="nm col-name${isDir ? ' dir' : ''}${it.t === 'l' ? ' link' : ''}${it.up ? ' up' : ''}" title="${esc(it.n)}${s && s.l ? ' → ' + esc(s.l) : ''}">${it.up ? UP_ICON : ''}${tree && !it.up ? `<span class="tcar${isDir ? '' : ' none'}${isDir && p.tree.has(fullPath(p, it)) ? ' on' : ''}" style="margin-left:${(it.depth || 0) * 16}px"${isDir ? ' title="Show what\'s inside here"' : ''}>${isDir ? mi('chev') : ''}</span>` : ''}${it.exit ? 'Back to ' + esc(p.findInfo.start) : binLabel(p, it) || (cm ? `<span class="nm-t ${cm}">${esc(it.n)}</span>` : esc(it.n))}${cs && CMP_TAG[cs] ? `<span class="cmp-tag ${cs}">${CMP_TAG[cs]}</span>` : ''}${cm ? `<span class="clip-tag ${cm}">${cm === 'cut' ? '✂ cut' : cm === 'del' ? '🗑 to delete' : '⧉ copy'}</span>` : ''}${dur ? `<span class="mus-len">${fmtT(dur)}</span>` : ''}${s && s.n > 1 && !it.up ? `<span class="nl-tag" title="Hard-linked: this file is in ${s.n} places, and takes its space only once">${LINK_IC}${s.n}</span>` : ''}${it.t === 'l' && !it.up ? `<span class="nl-tag sym" title="Symbolic link${s && s.l ? ' → ' + esc(s.l) : ''}">${SYM_IC}link</span>` : ''}${p.ud && p.udMap ? udCell(p, it) : ''}</div>
         <div class="num col-size${isDir && dirSize(p, it) != null ? ' dsz' : ''}${!isDir && s && s.s >= 1e9 ? ' gb' : ''}">${it.up ? '—' : isDir && dirSize(p, it) != null ? fmtSize(dirSize(p, it)) : s ? (isDir ? '—' : fmtSize(s.s)) : ''}</div>
         <div class="col-disk">${it.up ? '' : diskCell(p, it)}</div>
         <div class="perm col-date" title="${s && s.m ? new Date(s.m * 1000).toLocaleString() : ''}">${it.up ? '—' : s ? fmtDate(s.m) : ''}</div>
@@ -12788,7 +13417,7 @@ window.UC_COVER_FONT = [
     p.armed = null;
     p.cursor = Math.max(0, Math.min(p.items.length - 1, i));
     musFollow(p);
-    if (p.gal || p.mt) { drawRows(p); galScroll(p); return; }
+    if (tilesOn(p)) { drawRows(p); galScroll(p); return; }
     const top = p.cursor * ROW, h = p.list.clientHeight;
     if (center) p.list.scrollTop = Math.max(0, top - h / 2);
     else if (top < p.list.scrollTop) p.list.scrollTop = top;
@@ -12841,7 +13470,11 @@ window.UC_COVER_FONT = [
 
   /* ---------- the menu itself (a bottom sheet on touch screens) ---------- */
   /* line icons, drawn like the rest of unCommander's */
+  /* row markers: hard links (with the count) and symbolic links - bold enough to spot at a glance */
+  const LINK_IC = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.6 9.4l2.8-2.8"/><path d="M7.2 4.7l1.3-1.3a2.6 2.6 0 0 1 3.7 3.7l-1.3 1.3"/><path d="M8.8 11.3l-1.3 1.3a2.6 2.6 0 0 1-3.7-3.7l1.3-1.3"/></svg>';
+  const SYM_IC = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13V9a3 3 0 0 1 3-3h7"/><path d="M10 3l3 3-3 3"/></svg>';
   const MI = {
+    chain: '<path d="M6.6 9.4l2.8-2.8"/><path d="M7.3 4.6l1.2-1.2a2.6 2.6 0 0 1 3.7 3.7L11 8.3"/><path d="M8.7 11.4l-1.2 1.2a2.6 2.6 0 0 1-3.7-3.7L5 7.7"/>',
     view: '<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>',
     edit: '<path d="M10.5 2.5l3 3-8 8h-3v-3z"/><path d="M9 4l3 3"/>',
     open: '<path d="M1.5 4v8.5h13V5.5H8L6.5 4z"/>',
@@ -13422,6 +14055,8 @@ window.UC_COVER_FONT = [
       items.push(allTagged ? { label: 'Untag', ic: 'trash', sub: 'take it off the delete list', run: () => clipUntag(p, idx) }
         : { label: 'Tag for delete', ic: 'trash', danger: true, sub: 'add to the delete list - nothing is deleted yet', lock: lockIf('deleting'), run: () => clipTake(p, idx, 'del') });
     }
+    const raws = its.filter(t => !itDir(p, t) && RAWX.test(t.n));
+    if (raws.length) items.push({ label: raws.length === 1 ? 'Save as JPG' : `Save ${raws.length} RAW photos as JPG`, ic: 'copy', sub: "the camera's preview, as a .jpg next to each - the RAW stays", run: () => heicToJpg(raws.map(t => fullPath(p, t))) });
     const heics = its.filter(t => !itDir(p, t) && HEIC.test(t.n));
     if (heics.length) items.push({ label: heics.length === 1 ? 'Convert to JPG' : `Convert ${heics.length} HEIC to JPG`, ic: 'copy', sub: 'a .jpg next to each - the HEIC stays', run: () => heicToJpg(heics.map(t => fullPath(p, t))) });
     const nT = ticked().length;
@@ -13451,7 +14086,8 @@ window.UC_COVER_FONT = [
     if (inDir && q.mode === 'dir' && !q.root) {
       const into = `into ${base(q.path) || q.path} (${q.i ? 'right' : 'left'} pane)`;
       items.push('-', { label: 'Copy to the other pane', ic: 'copy', sc: fkKeyOf('copy'), sub: into, run: () => actOn(p, idx, 'copy') },
-                      { label: 'Move to the other pane', ic: 'pane', sc: fkKeyOf('move'), sub: into, lock: lockIf('moving'), run: () => actOn(p, idx, 'move') });
+                      { label: 'Move to the other pane', ic: 'pane', sc: fkKeyOf('move'), sub: into, lock: lockIf('moving'), run: () => actOn(p, idx, 'move') },
+                      { label: 'Link in the other pane…', ic: 'chain', sub: 'a hard or symbolic link - no extra space', lock: lockIf('making links'), run: () => linkDlg(p, its, q) });
     }
     items.push('-', { label: forGood ? 'Delete for good…' : 'Delete…', ic: 'trash', sc: fkKeyOf('delete') || 'Del', danger: true, lock: lockIf('deleting'), run: () => actOn(p, idx, 'delete') });
     showMenu(x, y, one ? base(path) : `${its.length.toLocaleString()} ticked items`, items);
@@ -13526,7 +14162,7 @@ window.UC_COVER_FONT = [
     let rd = null;
     const end = () => { if (rd) clearTimeout(rd.t); rd = null; };
     p.list.addEventListener('pointerdown', e => {
-      if (e.button !== 2 || e.pointerType !== 'mouse' || e.shiftKey || !rtickOn() || p.gal || p.mt) return;
+      if (e.button !== 2 || e.pointerType !== 'mouse' || e.shiftKey || !rtickOn() || tilesOn(p)) return;
       const i = rowIdx(e); end();
       if (i == null || !p.items[i] || p.items[i].up) return;
       setActive(p.i);
@@ -13755,7 +14391,7 @@ window.UC_COVER_FONT = [
       return clipTake(p, p.sel.size ? [...p.sel].sort((a, b) => a - b) : [p.cursor], k === 'x' ? 'cut' : 'copy');
     }
     if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) { e.preventDefault(); return menuAtCursor(); }
-    if ((p.gal || p.mt) && /^Arrow(Up|Down|Left|Right)$/.test(e.key) && !e.shiftKey) {
+    if (tilesOn(p) && /^Arrow(Up|Down|Left|Right)$/.test(e.key) && !e.shiftKey) {
       e.preventDefault();
       const c = galCols(p);
       return moveCursor(p, p.cursor + { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -c, ArrowDown: c }[e.key]);
@@ -14482,12 +15118,30 @@ window.UC_COVER_FONT = [
   }
 
   /* ---------- image & PDF viewer (F2 on those files) ---------- */
-  const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif', 'heic', 'heif', 'tif', 'tiff', 'svg']);
+  /* RAW photos (Fuji, Nikon, Canon, Sony, DNG, Olympus, Panasonic, Pentax, Samsung): shown from the
+   * camera's own JPG preview inside the file - the server finds it, nothing to install */
+  const RAWX = /\.(raf|nef|nrw|cr2|cr3|arw|srf|sr2|dng|orf|rw2|pef|srw)$/i;
+  const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif', 'heic', 'heif', 'tif', 'tiff', 'svg', 'raf', 'nef', 'nrw', 'cr2', 'cr3', 'arw', 'srf', 'sr2', 'dng', 'orf', 'rw2', 'pef', 'srw']);
   const rawUrl = path => `${API}?action=raw&path=${encodeURIComponent(path)}`;
+  const prevUrl = path => `${API}?action=rawprev&path=${encodeURIComponent(path)}`;
+  const picUrl = path => RAWX.test(path) ? prevUrl(path) : rawUrl(path);   // what an <img> can show
+  /* a photo's details (camera, lens, exposure, date, place) - read on the server, kept for the session */
+  const EXIF_OK = /\.(jpe?g|heic|heif|tiff?|webp|png|avif|raf|nef|nrw|cr2|cr3|arw|srf|sr2|dng|orf|rw2|pef|srw)$/i;
+  const metaCache = new Map();
+  function photoMeta(path) {
+    if (!metaCache.has(path)) metaCache.set(path, api('photo_meta', { path }).catch(e => { metaCache.delete(path); return { sections: [], gps: null, err: e.message }; }));
+    return metaCache.get(path);
+  }
+  const mapUrl = ([la, lo]) => `https://www.google.com/maps/search/?api=1&query=${la},${lo}`;
+  function metaHtml(m, fileRows = []) {
+    const sec = (t, rows, extra = '') => rows.length || extra ? `<div class="ex-sec"><div class="ex-h">${esc(t)}</div>${rows.map(([l, v]) => `<div class="ex-r"><span class="ex-l">${esc(l)}</span><span class="ex-v">${esc(v)}</span></div>`).join('')}${extra}</div>` : '';
+    const parts = (m.sections || []).map(([t, rows]) => sec(t, rows, t === 'Location' && m.gps ? `<a class="ex-map" href="${esc(mapUrl(m.gps))}" target="_blank" rel="noopener noreferrer">Show on Google Maps ↗</a>` : ''));
+    return (fileRows.length ? sec('File', fileRows) : '') + (parts.join('') || `<div class="ex-none muted">${m.err ? esc(m.err) : 'No camera details in this picture.'}</div>`);
+  }
   function openMedia(path, o = {}) {
     const ext = (path.split('.').pop() || '').toLowerCase();
     const backBtn = o.back ? [{ label: '‹ Results', run: () => { o.back(); return false; } }] : [];
-    const newTab = { label: 'Open in new tab', title: 'Full-screen in its own browser tab', run: () => { window.open(rawUrl(cur()), '_blank', 'noopener'); return false; } };
+    const newTab = { label: 'Open in new tab', title: 'Full-screen in its own browser tab', run: () => { window.open(picUrl(cur()), '_blank', 'noopener'); return false; } };
     if (ext === 'pdf') {
       openDlg(base(path), `
         <div class="vw-meta mono">${esc(path)}</div>
@@ -14504,32 +15158,41 @@ window.UC_COVER_FONT = [
     let i = Math.max(0, list.indexOf(path));
     const cur = () => list[i];
     openDlg(base(path), `
-      <div class="mv-stage"><img class="mv-img" alt=""></div>
-      <div class="mv-meta"><span class="mv-name mono"></span><span class="mv-info muted"></span></div>`,
+      <div class="mv-wrap${store.get('mvside', true) ? '' : ' noside'}"><div class="mv-stage"><img class="mv-img" alt=""><button type="button" class="gp-nav prev" title="Previous picture (←)">‹</button><button type="button" class="gp-nav next" title="Next picture (→)">›</button></div><aside class="mv-side" aria-label="Photo details"></aside></div>
+      <div class="mv-meta"><span class="mv-name mono"></span><button type="button" class="mv-tog" title="Show or hide the photo details">Details</button><span class="mv-info muted"></span></div>`,
       [...backBtn,
-       { label: '‹ Prev', run: () => { show(i - 1); return false; } },
-       { label: 'Next ›', run: () => { show(i + 1); return false; } },
-       { label: 'Edit picture', title: 'Rotate, flip, crop, resize or change the type', run: () => { if (!EDIT_IMG.test(cur())) { toast("This kind of picture can't be edited here", true); return false; } openImageEditor(cur()); return false; } },
-       newTab, { label: 'Close', primary: true }], 'full');
-    const stage = $('.mv-stage', dlg), img = $('.mv-img', dlg);
+       { label: 'Edit picture', title: 'Rotate, flip, crop, resize or change the type', run: () => { if (!EDIT_IMG.test(cur())) { toast(RAWX.test(cur()) ? 'RAW photos are never changed here - right-click it and Save as JPG to edit a copy' : "This kind of picture can't be edited here", true); return false; } openImageEditor(cur()); return false; } },
+       newTab, { label: 'Close', primary: true }], 'full mv-dlg');
+    const stage = $('.mv-stage', dlg), img = $('.mv-img', dlg), side = $('.mv-side', dlg), wrap = $('.mv-wrap', dlg);
+    $('.mv-tog', dlg).addEventListener('click', () => { const on = wrap.classList.toggle('noside'); store.set('mvside', !on); });
+    /* the details column: the file, then what the camera wrote */
+    const drawSide = () => {
+      const want = cur(), st = p.stats.get(base(want)) || {};
+      const fileRows = [['Name', base(want)], img.naturalWidth && cur() === want ? ['Shown', `${img.naturalWidth} × ${img.naturalHeight}${RAWX.test(want) ? ' (camera preview)' : ''}`] : null,
+        st.s != null ? ['File size', fmtBytes(st.s)] : null, st.m ? ['Modified', fmtDate(st.m)] : null].filter(Boolean);
+      if (!EXIF_OK.test(want)) { side.innerHTML = metaHtml({ sections: [] }, fileRows).replace('No camera details in this picture.', 'This kind of picture has no camera details.'); return; }
+      side.innerHTML = metaHtml({ sections: [] }, fileRows).replace(/<div class="ex-none[^]*$/, '') + '<div class="ex-none muted">Reading the details…</div>';
+      photoMeta(want).then(m => { if (cur() === want) side.innerHTML = metaHtml(m, fileRows); });
+    };
     const btns = $$('.dlg-foot .uc-btn', dlg), off = backBtn.length;
     function show(n) {
       if (n < 0 || n >= list.length) return;
       i = n;
       stage.classList.remove('zoom'); stage.classList.add('loading');
       delete img.dataset.conv;
-      img.src = rawUrl(cur());
+      img.src = picUrl(cur());
       $('.dlg-head', dlg).textContent = base(cur());
       $('.mv-name', dlg).textContent = base(cur());
       $('.mv-info', dlg).textContent = list.length > 1 ? `${i + 1} of ${list.length}` : '';
-      setTimeout(() => { btns[off].disabled = i === 0; btns[off + 1].disabled = i === list.length - 1; });
-      if (list.length < 2) { btns[off].hidden = btns[off + 1].hidden = true; }
+      $('.gp-nav.prev', stage).disabled = i === 0; $('.gp-nav.next', stage).disabled = i === list.length - 1;   // ‹ › over the picture
+      setTimeout(() => { btns[off].hidden = RAWX.test(cur()); });   // RAW: never edited
     }
     img.addEventListener('load', () => {
       stage.classList.remove('loading');
       const s = p.stats.get(base(cur())) || {};
-      $('.mv-info', dlg).textContent = [img.naturalWidth ? `${img.naturalWidth} × ${img.naturalHeight}` : '', s.s != null ? fmtBytes(s.s) : '',
+      $('.mv-info', dlg).textContent = [img.naturalWidth ? `${img.naturalWidth} × ${img.naturalHeight}${RAWX.test(cur()) ? ' camera preview' : ''}` : '', s.s != null ? fmtBytes(s.s) : '',
         list.length > 1 ? `${i + 1} of ${list.length}` : ''].filter(Boolean).join(' · ');
+      drawSide();
     });
     img.addEventListener('error', () => {
       if (HEIC.test(cur()) && !img.dataset.conv) {          // not Safari: convert it here
@@ -14537,9 +15200,11 @@ window.UC_COVER_FONT = [
         const want = cur();
         return heicUrl(want).then(u => { if (cur() === want) img.src = u; }, e => { stage.classList.remove('loading'); $('.mv-info', dlg).textContent = e.message; });
       }
-      stage.classList.remove('loading'); $('.mv-info', dlg).textContent = "This browser can't show this image type.";
+      stage.classList.remove('loading'); $('.mv-info', dlg).textContent = RAWX.test(cur()) ? "No preview found inside this RAW file." : "This browser can't show this image type.";
     });
     img.addEventListener('click', () => stage.classList.toggle('zoom'));   // tap: fit ↔ actual size
+    $('.gp-nav.prev', stage).addEventListener('click', e => { e.stopPropagation(); show(i - 1); });
+    $('.gp-nav.next', stage).addEventListener('click', e => { e.stopPropagation(); show(i + 1); });
     dlg.extraKey = e => {
       if (e.key === 'ArrowRight') { e.preventDefault(); show(i + 1); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); show(i - 1); }
@@ -14964,10 +15629,10 @@ window.UC_COVER_FONT = [
    * F-keys, Copy/Cut/Paste and drag all work as in the list. Leaving puts both
    * panes back as they were. Small pictures come from the server (PHP's GD,
    * kept in RAM); HEIC ones are made in the browser. */
-  const GAL_IMG = /\.(jpe?g|png|gif|webp|bmp|avif|svg|heic|heif|tiff?|ico)$/i;
+  const GAL_IMG = /\.(jpe?g|png|gif|webp|bmp|avif|svg|heic|heif|tiff?|ico|raf|nef|nrw|cr2|cr3|arw|srf|sr2|dng|orf|rw2|pef|srw)$/i;
   const GAL_VID = /\.(mp4|m4v|mov|mkv|webm|avi|wmv|ts|m2ts|mpe?g|vob)$/i;
   const GAL_AUD = /\.(mp3|m4a|m4b|aac|flac|ogg|oga|opus|wav|wma|aiff?|alac|ape|wv|mka|ac3|eac3|dts|mp2|amr|caf|dsf|dff|weba)$/i;
-  const THUMB_OK = /\.(jpe?g|png|gif|webp|bmp|avif)$/i;
+  const THUMB_OK = /\.(jpe?g|png|gif|webp|bmp|avif|raf|nef|nrw|cr2|cr3|arw|srf|sr2|dng|orf|rw2|pef|srw)$/i;   // made on the server (RAW: from its preview)
   const GAL_SIZES = { s: [110, 240], m: [160, 320], l: [230, 480] };
   const thumbUrl = (path, s) => `${API}?action=thumb&s=${s}&path=${encodeURIComponent(path)}`;
   const GI = {
@@ -14985,16 +15650,103 @@ window.UC_COVER_FONT = [
     return n >= 5 || (n > 0 && n / f >= .25);
   }
   const galSize = () => GAL_SIZES[store.get('galSize', 'm')] || GAL_SIZES.m;
+  /* Gallery only: the line between the panes can be dragged (20-80%), double-click for half and half.
+   * The width is kept for next time you use Gallery; outside Gallery the panes are always 50/50. */
+  const splitEl = document.createElement('div');
+  splitEl.className = 'uc-splitter'; splitEl.title = "Drag to change the panes' widths - double-click for half and half";
+  $('.uc-panes', root).appendChild(splitEl);
+  function splitPos() {
+    if (!root.classList.contains('uc-galsplit')) return;
+    const pr = $('.uc-panes', root).getBoundingClientRect(), a = panes[0].el.getBoundingClientRect();
+    splitEl.style.left = (a.right - pr.left + 4) + 'px';
+  }
+  /* the gallery side keeps its width in pixels: making the browser bigger or smaller only changes the preview */
+  const GAL_MIN = 150, PREV_MIN = 360;
+  function splitBox() { const box = $('.uc-panes', root), cs = getComputedStyle(box); return [box, parseFloat(cs.paddingLeft), box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)]; }
+  function splitSet(px) {
+    const [, , cw] = splitBox(), half = (cw - 8) / 2;
+    if (!px) px = half;
+    px = Math.round(Math.max(Math.min(GAL_MIN, half), Math.min(px, cw - 8 - PREV_MIN)));
+    root.style.setProperty('--gal-left', px + 'px'); splitPos(); galFitAll();
+    return px;
+  }
+  /* Gallery cards keep their size (S/M/L) and wrap like icons in a file window. A pane too narrow
+   * for one card of that size uses S cards; too narrow for two S cards, it becomes the normal file
+   * list (the preview stays). The list drops columns from the right before a name would be cut. */
+  var measureCtx = null;
+  function nameWidth(p) {
+    const el = $('.uc-row .nm', p.list) || $('.uc-list', p.el);
+    measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+    const cs = getComputedStyle(el); measureCtx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    let w = 0; for (const it of p.items.slice(0, 3000)) w = Math.max(w, measureCtx.measureText(it.up ? '..' : it.n).width);
+    return Math.ceil(w);
+  }
+  function galFit(p) {
+    const on = root.classList.contains('uc-galsplit') && p.gal && !p.mt;
+    const inner = p.el.clientWidth - 18, T = galSize()[0], S = GAL_SIZES.s[0];
+    const list = on && inner < S * 2 + 8;      // not even two S cards side by side: a list says more
+    if (on && !list) p.el.style.setProperty('--tile', (inner < T ? S : T) + 'px');
+    p.el.classList.toggle('gal-narrow', on && p.el.clientWidth < 470);
+    if (list !== !!p.galList) {
+      p.galList = list; p.galItems = null;
+      p.el.classList.toggle('gal', !!p.gal && !list); p.el.classList.toggle('gal-list', list);
+      if (!list) { p.colCut = null; applyCols(p); }
+      draw(p); moveCursor(p, p.cursor, true);
+    }
+    if (list) {
+      const c = store.get('cols' + p.i, {}), fs = parseFloat(getComputedStyle(root).getPropertyValue('--fs')) || 1;
+      const want = COLS.filter(([k]) => colWanted(c, k) && (k !== 'disk' || userView(p)));
+      let room = p.el.clientWidth - 36 - 10 - 24 - 14 - nameWidth(p);
+      const cut = new Set(); let used = want.reduce((t, [, , w]) => t + parseFloat(w) * fs, 0);
+      for (let k = want.length - 1; k >= 0 && used > room; k--) { cut.add(want[k][0]); used -= parseFloat(want[k][2]) * fs; }
+      const key = [...cut].join();
+      if (key !== (p.colCut ? [...p.colCut].join() : '')) { p.colCut = cut.size ? cut : null; applyCols(p); }
+    }
+  }
+  const galFitAll = () => panes.forEach(galFit);
+  function splitSync() {
+    const on = panes.some(q => q.gal);
+    root.classList.toggle('uc-galsplit', on);
+    if (on) splitSet(+store.get('galsplitpx', 0) || 0); else root.style.removeProperty('--gal-left');
+    galFitAll();
+    requestAnimationFrame(() => { splitPos(); galFitAll(); });
+    if (!on) panes.forEach(q => { if (q.galList) { q.galList = false; q.el.classList.remove('gal-list'); } });
+  }
+  splitEl.addEventListener('pointerdown', e => {
+    e.preventDefault(); splitEl.setPointerCapture(e.pointerId); splitEl.classList.add('drag'); root.classList.add('uc-splitting');
+    const [box, pl] = splitBox();
+    let last = 0;
+    const move = ev => { last = splitSet(ev.clientX - box.getBoundingClientRect().left - pl - 4); };
+    const up = () => {
+      splitEl.removeEventListener('pointermove', move); splitEl.removeEventListener('pointerup', up); splitEl.removeEventListener('pointercancel', up);
+      splitEl.classList.remove('drag'); root.classList.remove('uc-splitting');
+      if (last) store.set('galsplitpx', last);
+      panes.forEach(q => { if (q.gal) galScroll(q); });
+    };
+    splitEl.addEventListener('pointermove', move); splitEl.addEventListener('pointerup', up); splitEl.addEventListener('pointercancel', up);
+  });
+  splitEl.addEventListener('dblclick', () => { store.set('galsplitpx', 0); splitSet(0); });
+  window.addEventListener('resize', () => requestAnimationFrame(() => { if (root.classList.contains('uc-galsplit')) splitSet(+store.get('galsplitpx', 0) || 0); }));
   function galSet(p, on) {
     const q = panes[1 - p.i];
     if (on) { if (q.gal) galSet(q, false); if (cmpOn) endCompare(true); }
     p.gal = !!on; store.set('gal' + p.i, p.gal);
+    p.galRoot = p.gal ? p.path : null;
+    if (p.gal) {                                   // start on the first picture (not on "..")
+      const cur = p.items[p.cursor];
+      if (!cur || cur.up || itDir(p, cur) || !GAL_IMG.test(cur.n)) {
+        let k = p.items.findIndex(t => !t.up && !itDir(p, t) && GAL_IMG.test(t.n));
+        if (k < 0) k = p.items.findIndex(t => !t.up && !itDir(p, t));
+        if (k >= 0) p.cursor = k;
+      }
+    }
     p.el.classList.toggle('gal', p.gal);
     p.galItems = null; p.galLast = -1;
     if (p.gal) { p.el.style.setProperty('--tile', galSize()[0] + 'px'); galPrevMake(q, p); }
     else { galPrevRemove(q); p.list.scrollTop = Math.max(0, p.cursor * ROW - p.list.clientHeight / 2); }
     if (p.mode === 'dir') applySort(p); else draw(p);
     if (p.gal) setTimeout(() => galScroll(p), 30);
+    splitSync();
   }
   function galCols(p) {
     const cur = $(`.uc-tile[data-idx="${p.cursor}"]`, p.list);
@@ -15021,7 +15773,7 @@ window.UC_COVER_FONT = [
     else pic = `<span class="tl-ic">${GAL_VID.test(it.n) ? GI.vid : GAL_AUD.test(it.n) ? GI.aud : GAL_IMG.test(it.n) ? GI.pic : GI.file}</span>`;
     return `<div class="uc-row uc-tile${p.sel.has(i) ? ' sel' : ''}${i === p.cursor ? ' cursor' : ''}${cm ? ' clip-' + cm : ''}" data-idx="${i}"${!it.up && finePointer() ? ' draggable="true"' : ''} title="${esc(it.up ? 'Up one folder' : it.n)}">
       ${it.up ? '' : `<div class="col-sel"><span class="box${p.sel.has(i) ? ' on' : ''}"></span></div>`}
-      <div class="tl-pic">${pic}${ext && !THUMB_OK.test(it.n) ? `<span class="tl-ext">${esc(ext)}</span>` : ''}</div>
+      <div class="tl-pic">${pic}${ext && (!THUMB_OK.test(it.n) || RAWX.test(it.n)) ? `<span class="tl-ext">${esc(ext)}</span>` : ''}</div>
       <div class="nm${dir ? ' dir' : ''}">${it.up ? '..' : cm ? `<span class="nm-t ${cm}">${esc(it.n)}</span>` : esc(it.n)}</div>${p.mt && dir && !it.up ? `<div class="tl-sub">${esc(musSub(p, it))}</div>` : ''}${cm ? `<span class="clip-tag ${cm}">${cm === 'cut' ? '✂ cut' : cm === 'del' ? '🗑 to delete' : '⧉ copy'}</span>` : ''}</div>`;
   }
   /* HEIC tiles: made in the browser, only for the ones scrolled into view */
@@ -15075,16 +15827,24 @@ window.UC_COVER_FONT = [
     el.className = 'uc-gprev';
     el.innerHTML = `<div class="gp-head"><span class="gp-t">Preview</span><span class="gp-name"></span><button type="button" class="uc-btn gp-x" title="Back to the list (this pane shows its folder again)">✕ Close gallery</button></div>
       <div class="gp-body"></div><div class="gp-foot"><span class="gp-info muted"></span><span class="gp-btns"></span></div>`;
+    if (gpRO) gpRO.observe($('.gp-body', el));
     $('.uc-box', q.el).appendChild(el);
     q.prev = el;
     el.addEventListener('mousedown', e => { e.stopPropagation(); setActive(p.i); });
     $('.gp-x', el).addEventListener('click', () => galSet(p, false));
+    /* Details on/off: the photo's details beside or under the picture */
+    $('.gp-btns', el).addEventListener('change', e => {
+      if (!e.target.matches('[data-gpex]')) return;
+      store.set('gpex', e.target.checked);
+      const body = $('.gp-body', el); body.classList.toggle('ex-off', !e.target.checked); gpLayout(body);
+    });
     $('.gp-btns', el).addEventListener('click', e => {
       const b = e.target.closest('[data-gp]'); if (!b) return;
       const it = p.items[p.cursor]; if (!it || it.up) return;
       if (b.dataset.gp === 'view') openItem(p, p.cursor);
       if (b.dataset.gp === 'edit') openImageEditor(fullPath(p, it));
-      if (b.dataset.gp === 'tab') window.open(rawUrl(fullPath(p, it)), '_blank', 'noopener');
+      if (b.dataset.gp === 'tab') window.open(picUrl(fullPath(p, it)), '_blank', 'noopener');
+      if (b.dataset.gp === 'rawjpg') heicToJpg([fullPath(p, it)]);
       if (b.dataset.gp === 'play') musPlayFile(fullPath(p, it));
       if (b.dataset.gp === 'add') plAdd([fullPath(p, it)]);
     });
@@ -15094,19 +15854,51 @@ window.UC_COVER_FONT = [
     const q = panes[1 - p.i], el = q.prev; if (!el || !p.gal) return;
     const it = p.items[p.cursor], body = $('.gp-body', el), info = $('.gp-info', el), btns = $('.gp-btns', el);
     $('.gp-name', el).textContent = it ? (it.up ? '..' : it.n) : '';
-    killMedia(body); body.innerHTML = ''; info.textContent = ''; btns.innerHTML = ''; delete info.dataset.px;
-    if (!it || it.up) { body.innerHTML = `<span class="gp-ic">${GI.up}</span>`; return; }
+    killMedia(body); body.innerHTML = ''; body.classList.remove('has-ex', 'ex-right', 'ex-bottom'); info.textContent = ''; btns.innerHTML = ''; delete info.dataset.px;
+    if (!it || it.up) { body.innerHTML = it ? `<div class="gp-msg">Up to ${esc(base(parent(p.path)) || '/')} - double-click to go up</div>` : ''; return; }
     const path = fullPath(p, it), want = path;
-    if (itDir(p, it)) { body.innerHTML = `<span class="gp-ic">${GI.dir}</span>`; info.textContent = 'Folder - double-click or Enter opens it'; return; }
+    if (itDir(p, it)) {
+      /* a folder: a fan of the pictures in it (poster / folder / cover first) - blank cards while it's read */
+      body.innerHTML = `<div class="gp-fan loading">${[2, 1, 0].map(k => `<span class="fc fc${k}"></span>`).join('')}</div><div class="gp-msg">${esc(it.n)}</div>`;
+      info.textContent = 'Folder - double-click or Enter opens it';
+      folderPics(path).then(f => {
+        if (!body.isConnected || p.items[p.cursor] !== it) return;
+        const fan = $('.gp-fan', body), picks = f.pics.slice(0, 3);
+        fan.classList.remove('loading');
+        if (picks.length) fan.innerHTML = [2, 1, 0].map(k => picks[k] ? `<img class="fc fc${k}" alt="" src="${esc(thumbUrl(join(path, picks[k]), 480))}">` : `<span class="fc fc${k}"></span>`).join('');
+        else { fan.classList.add('empty'); $('.fc0', fan).innerHTML = GI.dir; }
+        const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+        const parts = [f.nPics ? pl(f.nPics, 'picture') : '', f.nOther ? pl(f.nOther, f.nPics ? 'other file' : 'file') : '', f.nDirs ? pl(f.nDirs, 'folder') : ''].filter(Boolean);
+        $('.gp-msg', body).textContent = f.err ? `${it.n} - ${f.err}` : `${it.n} · ${parts.join(' · ') || 'empty'}`;
+      });
+      return;
+    }
     const B = (k, l) => `<button type="button" class="uc-btn" data-gp="${k}">${l}</button>`;
     if (GAL_IMG.test(it.n)) {
       const img = document.createElement('img'); img.alt = '';
-      if (THUMB_OK.test(it.n)) { img.src = thumbUrl(path, 640); const full = new Image(); full.onload = () => { if (img.isConnected) img.src = full.src; }; full.src = rawUrl(path); }
+      if (THUMB_OK.test(it.n)) { img.src = thumbUrl(path, 640); const full = new Image(); full.onload = () => { if (img.isConnected) img.src = full.src; }; full.src = picUrl(path); }
       else img.src = rawUrl(path);
       img.onerror = () => { if (HEIC.test(path) && !img.dataset.conv) { img.dataset.conv = '1'; heicUrl(path).then(u => { if (img.isConnected) img.src = u; }, er => { info.textContent = er.message; }); } };
       img.onload = () => { if (img.naturalWidth && !img.src.includes('action=thumb')) info.dataset.px = `${img.naturalWidth} × ${img.naturalHeight}`; galInfo(p, it, info); };
-      body.appendChild(img);
-      btns.innerHTML = B('view', 'View') + (EDIT_IMG.test(it.n) ? B('edit', 'Edit picture') : '') + B('tab', 'New tab');
+      const pic = document.createElement('div'); pic.className = 'gp-pic'; pic.appendChild(img); body.appendChild(pic);
+      /* ‹ › over the picture: the previous / next picture in the gallery */
+      const g = panes.find(x => x.gal) || p, picIdx = dir => { for (let k = g.cursor + dir; k >= 0 && k < g.items.length; k += dir) { const t = g.items[k]; if (!t.up && !itDir(g, t) && GAL_IMG.test(t.n)) return k; } return -1; };
+      for (const [cls, dir, lab] of [['prev', -1, '‹'], ['next', 1, '›']]) {
+        const k = picIdx(dir), b = document.createElement('button');
+        b.type = 'button'; b.className = 'gp-nav ' + cls; b.textContent = lab; b.title = dir < 0 ? 'Previous picture' : 'Next picture'; b.disabled = k < 0;
+        b.addEventListener('click', e => { e.stopPropagation(); const n = picIdx(dir); if (n >= 0) moveCursor(g, n); });
+        pic.appendChild(b);
+      }
+      img.addEventListener('load', () => gpLayout(body));
+      /* beside or under the picture: what the camera wrote */
+      if (EXIF_OK.test(it.n)) photoMeta(path).then(m => {
+        if (!img.isConnected || !(m.sections || []).length) return;
+        const ex = document.createElement('div'); ex.className = 'gp-ex'; ex.innerHTML = metaHtml(m);
+        body.classList.add('has-ex'); body.classList.toggle('ex-off', !store.get('gpex', true)); body.appendChild(ex); gpLayout(body);
+        /* the Details tick box - only for a picture that has details to show */
+        if (!$('[data-gpex]', btns)) btns.insertAdjacentHTML('afterbegin', `<label class="chk gp-exchk" title="Show the photo's details"><input type="checkbox" data-gpex${store.get('gpex', true) ? ' checked' : ''}> Details</label>`);
+      });
+      btns.innerHTML = B('view', 'View') + (EDIT_IMG.test(it.n) ? B('edit', 'Edit picture') : '') + (RAWX.test(it.n) ? B('rawjpg', 'Save as JPG') : '') + B('tab', 'View Image in New Tab');
     } else if (GAL_AUD.test(it.n)) {
       /* a song: its cover, and buttons - nothing starts by itself, so the player at the bottom isn't interrupted */
       body.innerHTML = `<img class="gp-cover" alt="" src="${esc(`${API}?action=cover&path=${encodeURIComponent(path)}`)}"><span class="gp-ic" hidden>${GI.aud}</span>`;
@@ -15123,6 +15915,43 @@ window.UC_COVER_FONT = [
     } else body.innerHTML = `<span class="gp-ic">${GI.file}</span>`;
     galInfo(p, it, info);
   }
+  /* what's in a folder, for its fan in the Gallery preview: one listing, only when the folder is picked */
+  const folderPeekCache = new Map();
+  function folderPics(path) {
+    if (!folderPeekCache.has(path)) folderPeekCache.set(path, api('list', { path }).then(r => {
+      const its = r.items || [], first = /^(poster|folder|cover|season\d*-poster|show)\.(jpe?g|png|webp)$/i;
+      const pics = its.filter(([n, t]) => t !== 'd' && GAL_IMG.test(n) && !n.startsWith('.')).map(([n]) => n)
+        .sort((a, b) => (first.test(b) ? 1 : 0) - (first.test(a) ? 1 : 0) || a.localeCompare(b, undefined, { numeric: true }));
+      return { pics, nPics: pics.length, nDirs: its.filter(([, t]) => t === 'd').length, nOther: its.filter(([n, t]) => t !== 'd' && !(GAL_IMG.test(n) && !n.startsWith('.'))).length };
+    }).catch(e => { folderPeekCache.delete(path); return { pics: [], nPics: 0, nDirs: 0, err: e.message }; }));
+    return folderPeekCache.get(path);
+  }
+  /* Gallery preview with photo details: the details go under the picture or beside it - whichever
+   * leaves the picture bigger - and take only the room they need */
+  function gpLayout(body) {
+    const ex = $('.gp-ex', body), img = $('.gp-pic img', body);
+    if (body.classList.contains('ex-off')) { body.classList.remove('ex-right', 'ex-bottom'); return; }
+    if (!ex || !img || !img.naturalWidth || !body.isConnected) return;
+    const cs = getComputedStyle(body), W = body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+      H = body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom), a = img.naturalWidth / img.naturalHeight, gap = 10, RW = 300;
+    const was = body.classList.contains('ex-right') ? 'r' : body.classList.contains('ex-bottom') ? 'b' : '';
+    const before = was ? [img.getBoundingClientRect(), ex.getBoundingClientRect()] : null;
+    body.classList.remove('ex-right'); body.classList.add('ex-bottom');
+    const mh = Math.min(ex.scrollHeight + 2, H * .55);
+    const under = Math.min(W, Math.max(0, H - mh - gap) * a, img.naturalWidth);
+    const beside = Math.min(W - RW - gap, H * a, img.naturalWidth);
+    const now = beside > under + 8 ? 'r' : 'b';
+    if (now === 'r') { body.classList.remove('ex-bottom'); body.classList.add('ex-right'); }
+    /* moving from under to beside (or back): slide the picture and the details to their new places */
+    if (before && was !== now && img.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      [[img, before[0]], [ex, before[1]]].forEach(([el, r0]) => {
+        const r1 = el.getBoundingClientRect(); if (!r1.width || !r1.height) return;
+        el.animate([{ transformOrigin: '0 0', transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top}px)` + (el === img ? ` scale(${r0.width / r1.width}, ${r0.height / r1.height})` : ''), opacity: el === ex ? 0 : 1 },
+          { transformOrigin: '0 0', transform: 'none', opacity: 1 }], { duration: 320, easing: 'cubic-bezier(.65,0,.35,1)' });
+      });
+    }
+  }
+  const gpRO = 'ResizeObserver' in window ? new ResizeObserver(es => es.forEach(e => requestAnimationFrame(() => gpLayout(e.target)))) : null;
   async function galInfo(p, it, info) {
     const k = it.abs || it.n;
     let s = p.stats.get(k);
@@ -17141,14 +17970,21 @@ window.UC_COVER_FONT = [
 
   /* Convert HEIC photos to JPG: each gets a .jpg next to it (never overwriting),
    * all in one History step. */
+  /* a RAW photo's preview as a JPG file's contents */
+  async function rawBlob(path) {
+    const r = await fetch(prevUrl(path), { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(r.status === 415 ? 'no preview found inside it' : `the server said ${r.status}`);
+    return r.blob();
+  }
   async function heicToJpg(paths) {
     let hist = null, ok = 0; const bad = [];
     for (const [i, path] of paths.entries()) {
       toast(`Converting ${i + 1} of ${paths.length}: ${base(path)}…`);
       try {
-        const blob = await heicConvert(path, 'image/jpeg', 1);
-        const r = await putFile(blob, path, 'new', base(path).replace(/\.hei[cf]$/i, '.jpg'),
-          hist ? { join: hist, label: `Converted ${i + 1} HEIC picture${i ? 's' : ''} to JPG` } : { label: `Converted ${base(path)} to JPG` });
+        const raw = RAWX.test(path);
+        const blob = raw ? await rawBlob(path) : await heicConvert(path, 'image/jpeg', 1);
+        const r = await putFile(blob, path, 'new', base(path).replace(raw ? RAWX : /\.hei[cf]$/i, '.jpg'),
+          hist ? { join: hist, label: `Converted ${i + 1} picture${i ? 's' : ''} to JPG` } : { label: `Converted ${base(path)} to JPG` });
         hist = r.hist || hist; ok++;
       } catch (e) { bad.push(`${base(path)}: ${e.message}`); if (/reinstall/.test(e.message)) break; }
     }
@@ -17727,7 +18563,8 @@ window.UC_COVER_FONT = [
       let err = '';
       let re = null;
       if (st.mode === 'replace' && st.find) {
-        try { re = new RegExp(st.regex ? st.find : reEsc(st.find), (st.first ? '' : 'g') + (st.mcase ? '' : 'i') + 'u'); }
+        const fnd = st.find.normalize('NFC');
+        try { re = new RegExp(st.regex ? fnd : reEsc(fnd), (st.first ? '' : 'g') + (st.mcase ? '' : 'i') + 'u'); }
         catch (e) { err = 'That pattern isn\'t valid: ' + e.message; }
       }
       const order = [...items].sort((a, b) => st.order === 'date' ? (a.m - b.m) || collator.compare(a.n, b.n) : collator.compare(a.n, b.n));
@@ -17737,8 +18574,13 @@ window.UC_COVER_FONT = [
         const [stem, ext] = split(it);
         let nw = stem, hiOld = esc(stem), hiNew = null;
         if (st.mode === 'replace' && re) {
-          nw = stem.replace(re, st.repl);
-          if (nw !== stem) {
+          /* names can spell an accent two ways (é as one character, or e plus an accent mark - common on files from a Mac);
+           * what you type is the first kind, so compare in that form. A name where nothing is found stays exactly as it was */
+          const sN = stem.normalize('NFC');
+          nw = sN.replace(re, st.repl);
+          if (nw === sN) nw = stem;
+          else {
+            const stem = sN;
             try { hiOld = stem.replace(re, m => '\u0001' + m + '\u0002'); hiOld = esc(hiOld).replace(/\u0001/g, '<mark class="del">').replace(/\u0002/g, '</mark>'); } catch (e) {}
             try { hiNew = esc(stem.replace(re, m => '\u0001' + m.replace(new RegExp(re.source, re.flags.replace('g', '')), st.repl) + '\u0002')).replace(/\u0001/g, '<mark class="add">').replace(/\u0002/g, '</mark>'); } catch (e) {}
           }
@@ -17775,10 +18617,16 @@ window.UC_COVER_FONT = [
 
     const modeTabs = [['replace', 'Replace text'], ['add', 'Add text'], ['number', 'Number'], ['case', 'Change case']];
     openDlg('Batch rename', `
+      <div class="br-saved"><span class="br-sl">Saved</span>
+        <div class="br-pickw"><button type="button" class="br-pick" title="Your saved rules"><span class="t"></span><span class="v" aria-hidden="true">▾</span></button><div class="br-list br-rlist" hidden></div></div>
+        <span class="br-savebox" hidden><input type="text" class="br-sname" placeholder="Name this rule, e.g. Dots to spaces" maxlength="40" spellcheck="false"><button type="button" class="uc-btn br-sok">Save</button><button type="button" class="uc-btn br-sno">Cancel</button></span>
+        <button type="button" class="br-saveas">Save these settings as…</button>
+        <div class="br-snote" hidden></div></div>
       <div class="br-top"><span class="br-seg">${modeTabs.map(([k, l]) => `<button data-mode="${k}" class="${k === st.mode ? 'on' : ''}">${l}</button>`).join('')}</span>
         <span class="muted">${items.length} item${items.length === 1 ? '' : 's'} ticked in <span class="mono">${esc(folder || p.path)}</span></span></div>
       <div class="br-rules"></div>
       <details class="br-help"><summary></summary><div class="br-help-body"></div></details>
+      <details class="br-help br-rx"><summary>Regex cheat sheet - ready-made patterns to click</summary><div class="br-rx-body">${BR_RX}</div></details>
       <div class="br-err uc-error" hidden></div>
       <div class="br-tbl"><div class="br-tr h"><div></div><div>Now</div><div></div><div>After</div><div></div></div><div class="br-rows"></div></div>
       <div class="br-sum"></div>`,
@@ -17788,7 +18636,11 @@ window.UC_COVER_FONT = [
     const go = $$('.dlg-foot .uc-btn', dlg).pop();
     const rulesEl = $('.br-rules', dlg), rowsEl = $('.br-rows', dlg), sumEl = $('.br-sum', dlg), errEl = $('.br-err', dlg);
     const chk = (k, l) => `<label class="chk"><input type="checkbox" data-k="${k}" ${st[k] ? 'checked' : ''}> ${l}</label>`;
-    const txt = (k, l, ph, w) => `<div class="field"${w ? ` style="max-width:${w}"` : ''}><label>${l}</label><input type="text" data-k="${k}" value="${esc(String(st[k]))}" placeholder="${esc(ph || '')}" spellcheck="false" autocapitalize="off" autocorrect="off"></div>`;
+    /* the text boxes; the ones that remember what you renamed with get a ▾ */
+    const HKEYS = ['find', 'repl', 'addText', 'pattern'];
+    const txt = (k, l, ph, w) => `<div class="field"${w ? ` style="max-width:${w}"` : ''}><label>${l}</label>${HKEYS.includes(k)
+      ? `<div class="br-in"><input type="text" data-k="${k}" value="${esc(String(st[k]))}" placeholder="${esc(ph || '')}" spellcheck="false" autocapitalize="off" autocorrect="off"><button type="button" class="br-dd" data-h="${k}" title="Used recently" aria-label="Used recently" tabindex="-1">▾</button><div class="br-list br-hlist" hidden></div></div>`
+      : `<input type="text" data-k="${k}" value="${esc(String(st[k]))}" placeholder="${esc(ph || '')}" spellcheck="false" autocapitalize="off" autocorrect="off">`}</div>`;
     /* Number help, worked through with the files you actually ticked */
     function numberHelp() {
       const ex = [...items].sort((a, b) => collator.compare(a.n, b.n)).filter(i => !i.dir).slice(0, 2);
@@ -17823,6 +18675,7 @@ window.UC_COVER_FONT = [
     }
     function drawRules() {
       drawHelp();
+      $('.br-rx', dlg).hidden = st.mode !== 'replace';
       const keep = chk('keepExt', 'Leave extensions alone (.mkv, .jpg …)');
       rulesEl.innerHTML = st.mode === 'replace' ? `<div class="br-grid">${txt('find', 'Find', 'e.g. IMG_')}${txt('repl', 'Replace with', 'leave empty to remove it')}</div>
           <div class="radios">${chk('mcase', 'Match upper/lower case')}${chk('first', 'First match only')}${chk('regex', 'Advanced pattern (regex)')}${keep}</div>`
@@ -17838,7 +18691,8 @@ window.UC_COVER_FONT = [
           <div class="radios">${keep}</div>`;
     }
     function drawRows() {
-      const err = compute();
+      let err;
+      try { err = compute(); } catch (e) { err = 'Something went wrong working out the new names: ' + e.message; items.forEach(it => { it.st = 'same'; it.new = it.n; }); }
       errEl.hidden = !err; errEl.textContent = err;
       const lim = 500;
       const ICON = { go: ['✓', 'will be renamed'], same: ['=', 'no change'], off: ['–', 'unticked - left alone'], bad: ['⚠', 'problem'] };
@@ -17873,6 +18727,95 @@ window.UC_COVER_FONT = [
       inp.focus(); inp.setSelectionRange(pos + c.dataset.chip.length, pos + c.dataset.chip.length); drawRows();
     });
     rowsEl.addEventListener('change', e => { const i = e.target.dataset.i; if (i != null) { items[+i].on = e.target.checked; drawRows(); } });
+    /* the regex cheat sheet: "Use" fills Find and Replace with and ticks the regex box */
+    $('.br-rx', dlg).addEventListener('click', e => {
+      const u = e.target.closest('[data-rx]'); if (!u) return;
+      const [find, repl] = BR_RX_LIST[+u.dataset.rx];
+      Object.assign(st, { find, repl, regex: true }); drawRules(); drawRows();
+      const f = $('input[data-k="find"]', rulesEl); if (f) f.focus();
+    });
+
+    /* ---- saved rules (kept on the server, so every browser has them) and recently used values (kept in this browser) ---- */
+    const RKEYS = ['mode', 'find', 'repl', 'mcase', 'first', 'regex', 'keepExt', 'addText', 'addWhere', 'pattern', 'start', 'digits', 'order', 'caseTo'];
+    const CASES = { lower: 'lower case', upper: 'UPPER CASE', title: 'Title Case', sentence: 'Sentence case' };
+    const ruleSub = r => r.mode === 'replace' ? `Replace "${r.find}" → "${r.repl}"${r.regex ? ' · regex' : ''}`
+      : r.mode === 'add' ? `Add "${r.addText}" ${r.addWhere === 'after' ? 'after' : 'before'} the name`
+      : r.mode === 'number' ? `Number · ${r.pattern}${r.order === 'date' ? ' · by date' : ''}` : `Change case · ${CASES[r.caseTo] || ''}`;
+    const savedEl = $('.br-saved', dlg), rlist = $('.br-rlist', dlg), sbox = $('.br-savebox', dlg), sname = $('.br-sname', dlg), snote = $('.br-snote', dlg);
+    let rules = Array.isArray(SET.brrules) ? SET.brrules : [], picked = '';
+    const listsOpen = () => $$('.br-list', dlg).some(l => !l.hidden);
+    const listClose = () => $$('.br-list', dlg).forEach(l => { l.hidden = true; });
+    const drawPick = () => { const t = $('.br-pick .t', dlg); t.textContent = picked || (rules.length ? 'Pick a saved rule…' : 'No saved rules yet'); t.classList.toggle('ph', !picked); };
+    function openRules() {
+      listClose();
+      rlist.innerHTML = rules.length ? '<div class="h">Your saved rules - pick one to fill everything in</div>' + rules.map((r, i) => `<div class="r${r.name === picked ? ' hl' : ''}" data-r="${i}"><span class="n">${esc(r.name)}</span><span class="s">${esc(ruleSub(r))}</span><button type="button" class="x" data-del="${i}" title="Delete this rule" aria-label="Delete">✕</button></div>`).join('')
+        : '<div class="h">No saved rules yet</div><div class="e">Set up a rule the way you like it, then click <b>Save these settings as…</b></div>';
+      rlist.hidden = false;
+    }
+    function useRule(r) {
+      for (const k of RKEYS) if (k in r) st[k] = r[k];
+      picked = r.name;
+      $$('.br-seg button', dlg).forEach(x => x.classList.toggle('on', x.dataset.mode === st.mode));
+      drawRules(); drawRows(); drawPick();
+    }
+    async function rulesPut(list, msg) {
+      try { const r = await api('brrules_set', { rules: JSON.stringify(list) }); rules = SET.brrules = r.rules || []; }
+      catch (e) { toast(e.message, true); return false; }
+      drawPick(); if (msg) toast(msg); return true;
+    }
+    const saveMode = on => { sbox.hidden = !on; $('.br-saveas', dlg).hidden = on; $('.br-pickw', dlg).hidden = on; snote.hidden = true; if (on) { sname.value = picked; sname.focus(); sname.select(); sameNote(); } };
+    function sameNote() { const v = sname.value.trim().toLowerCase(), same = v && rules.find(r => r.name.toLowerCase() === v); snote.hidden = !same; if (same) snote.textContent = `This replaces your saved rule "${same.name}".`; }
+    async function saveRule() {
+      const n = sname.value.trim().replace(/\s+/g, ' ');
+      if (!n) { toast('Give the rule a name', true); sname.focus(); return; }
+      const same = rules.find(r => r.name.toLowerCase() === n.toLowerCase()), rule = { name: n };
+      for (const k of RKEYS) rule[k] = st[k];
+      const list = rules.filter(r => r !== same); list.splice(same ? rules.indexOf(same) : list.length, 0, rule);
+      if (await rulesPut(list, same ? `Replaced "${same.name}"` : `Saved "${n}"`)) { picked = n; drawPick(); saveMode(false); }
+    }
+    $('.br-pick', dlg).addEventListener('click', e => { e.stopPropagation(); if (rlist.hidden) openRules(); else listClose(); });
+    $('.br-saveas', dlg).addEventListener('click', () => { listClose(); saveMode(true); });
+    $('.br-sok', dlg).addEventListener('click', saveRule);
+    $('.br-sno', dlg).addEventListener('click', () => saveMode(false));
+    sname.addEventListener('input', sameNote);
+    rlist.addEventListener('click', e => {
+      e.stopPropagation();
+      const del = e.target.closest('[data-del]');
+      if (del) { $('.br-pick', dlg).focus(); const r = rules[+del.dataset.del]; if (r.name === picked) picked = ''; rulesPut(rules.filter(x => x !== r), `Deleted "${r.name}"`).then(() => { if (!rlist.hidden) openRules(); }); return; }
+      const row = e.target.closest('[data-r]'); if (row) { listClose(); useRule(rules[+row.dataset.r]); }
+    });
+    /* recently used: what you renamed with, last 10 per box, newest first */
+    const hGet = k => { const v = store.get('brh.' + k, []); return Array.isArray(v) ? v : []; };
+    const hPush = () => {
+      const keys = st.mode === 'replace' ? ['find', 'repl'] : st.mode === 'add' ? ['addText'] : st.mode === 'number' ? ['pattern'] : [];
+      for (const k of keys) { const v = String(st[k] || ''); if (v) store.set('brh.' + k, [v, ...hGet(k).filter(x => x !== v)].slice(0, 10)); }
+    };
+    const HNAME = { find: 'Find', repl: 'Replace with', addText: 'Text to add', pattern: 'New name' };
+    rulesEl.addEventListener('click', e => {
+      const dd = e.target.closest('.br-dd');
+      if (dd) {
+        e.stopPropagation(); const l = $('.br-hlist', dd.parentNode), k = dd.dataset.h, h = hGet(k);
+        if (!l.hidden) { listClose(); return; }
+        listClose();
+        l.innerHTML = `<div class="h">Used recently in ${HNAME[k]}</div>` + (h.length ? h.map((v, i) => `<div class="r" data-hv="${i}"><span class="m">${esc(v)}</span></div>`).join('') + '<div class="sep"></div><div class="r a" data-hclear>Clear this list</div>'
+          : '<div class="e">Nothing yet - what you rename with is kept here.</div>');
+        l.hidden = false; return;
+      }
+      const hv = e.target.closest('[data-hv]'), hc = e.target.closest('[data-hclear]');
+      if (hv || hc) {
+        e.stopPropagation(); const box = e.target.closest('.br-in'), inp = $('input', box), k = inp.dataset.k;
+        if (hc) store.set('brh.' + k, []);
+        else { inp.value = hGet(k)[+hv.dataset.hv]; st[k] = inp.value; drawRows(); inp.focus(); }
+        listClose();
+      }
+    });
+    $('.dlg-body', dlg).addEventListener('click', e => { if (listsOpen() && !e.target.closest('.br-list')) listClose(); });
+    dlg.extraKey = e => {
+      if (e.key === 'Escape' && listsOpen()) { e.preventDefault(); listClose(); }
+      else if (e.key === 'Escape' && !sbox.hidden) { e.preventDefault(); saveMode(false); }
+      else if (e.key === 'Enter' && e.target === sname) { e.preventDefault(); saveRule(); }
+    };
+    drawPick();
     /* Rename for real: all or nothing on the server, then reload with the new names ticked */
     async function doRename() {
       if (compute() || items.some(it => it.st === 'bad')) return false;
@@ -17883,6 +18826,7 @@ window.UC_COVER_FONT = [
       try { r = await api('batch_rename', { path: bdir, pairs }); }
       catch (e) { toast(e.message, true); drawRows(); return false; }
       const dir = p.path;
+      hPush();
       closeDlg();
       await brReload(p, dir, pairs.map(x => x[1]));
       done(`Renamed ${r.count} item${r.count === 1 ? '' : 's'}`, r.hist);
@@ -17900,6 +18844,32 @@ window.UC_COVER_FONT = [
     drawRows(p); updateChrome(); saveSel();
     const o = panes.find(q => q !== p && q.mode === 'dir' && q.path === dir); if (o) refresh(o);
   }
+  /* the regex cheat sheet in Batch rename: [find, replace with, what it does, example] */
+  const BR_RX_LIST = [
+    ['\\s*\\(\\d{4}\\)', '', 'Remove a year in brackets', 'Heat (1995) → Heat'],
+    ['[._]', ' ', 'Dots and underscores to spaces', 'The.Office_S01 → The Office S01'],
+    ['\\.(1080p|720p|2160p|WEB|BluRay|x264|x265|YIFY).*$', '', 'Cut off release tags and everything after them', 'Pilot.1080p.WEB.YIFY → Pilot'],
+    ['\\s*\\[[^\\]]*\\]', '', 'Remove anything in [square brackets]', 'Movie [1080p] [HDR] → Movie'],
+    ['^\\d+\\s*[-.]\\s*', '', 'Remove a track number at the start', '01 - Song → Song'],
+    ['[!?]', '', 'Remove ! and ?', 'Garcia! → Garcia'],
+    ['^(.+?) - (.+)$', '$2 - $1', 'Swap the two sides of " - "', 'Artist - Title → Title - Artist'],
+    ['s(\\d+)e(\\d+)', 'S$1E$2', 'Season/episode in capitals', 's01e02 → S01E02'],
+    ['\\s{2,}', ' ', 'Squeeze double spaces into one', 'A  B → A B'],
+  ];
+  const BR_RX = `<p>A regex is a pattern that describes text instead of spelling it out. Click <b>Use</b> on one below - it fills in Find and Replace with and ticks <b>Advanced pattern (regex)</b>. The Now → After list shows exactly what it does before anything changes, and <b>Save these settings as…</b> keeps one you like under a plain name.</p>
+    <div class="br-rxl">${BR_RX_LIST.map(([f, r, what, ex], i) => `<div class="br-rxr"><button type="button" class="uc-btn" data-rx="${i}">Use</button><div><b>${esc(what)}</b><div class="muted">${esc(ex)}</div></div><div class="mono">${esc(f)}</div><div class="mono">${r === ' ' ? '<span class="muted">(a space)</span>' : r ? esc(r) : '<span class="muted">(empty)</span>'}</div></div>`).join('')}</div>
+    <h4>The building blocks</h4>
+    <table class="br-hl">
+      <tr><td class="mono">.</td><td>any one character - to mean a real dot, write <span class="mono">\\.</span></td></tr>
+      <tr><td class="mono">\\d &nbsp; \\s &nbsp; \\w</td><td>a digit · a space · a letter, digit or _</td></tr>
+      <tr><td class="mono">*  +  ?</td><td>the thing before it: any number of times · at least once · maybe once</td></tr>
+      <tr><td class="mono">{4} &nbsp; {2,}</td><td>exactly 4 times · 2 or more times</td></tr>
+      <tr><td class="mono">[abc] &nbsp; [^abc]</td><td>one of a, b, c · anything except them</td></tr>
+      <tr><td class="mono">^ &nbsp; $</td><td>the start · the end of the name</td></tr>
+      <tr><td class="mono">a|b</td><td>a or b</td></tr>
+      <tr><td class="mono">( )  then $1 $2</td><td>keep a part, and put it back in Replace with</td></tr>
+      <tr><td class="mono">\\( \\[ \\.</td><td>a backslash makes a special character mean itself</td></tr>
+    </table>`;
   const BR_HELP = {
     replace: `<p>Finds some text in each name and swaps it for something else. Leave "Replace with" empty to simply remove the text.</p>
       <ul><li><span class="mono">Summer Trip_Beach.jpg</span> - find <span class="mono">_</span>, replace with <span class="mono"> - </span> → <span class="mono">Summer Trip - Beach.jpg</span></li>
@@ -17959,6 +18929,25 @@ window.UC_COVER_FONT = [
     perms: ARC_RO, brename: ARC_RO, compress: 'Copy it out of the archive first (F5), then compress it', extract: 'Copy it out of the archive first (F5)', restore: ARC_RO,
     sizes: 'The sizes are shown already - inside an archive every file has its size', find: "Find doesn't look inside archives - go up out of it first", compare: "Compare doesn't work inside archives - copy it out first" };
   /* an archive that needs its password: asked once, kept in memory on the server until the next reboot */
+  /* Link in the other pane: hard links (same disk or pool only, no extra space) or symbolic links */
+  function linkDlg(p, its, q) {
+    const srcs = its.map(t => fullPath(p, t)), one = srcs.length === 1, dirs = its.some(t => itDir(p, t));
+    const what = one ? `<b>${esc(base(srcs[0]))}</b>` : `<b>${srcs.length.toLocaleString()} items</b>`;
+    openDlg(`Link ${one ? esc(base(srcs[0])) : srcs.length.toLocaleString() + ' items'} in the other pane`, `
+      <div class="muted">Makes ${what} appear in <span class="mono">${esc(q.path)}</span> too, without copying anything.</div>
+      <label class="st-radio"><input type="radio" name="lk" value="hard" checked><span><b>Hard link</b><br><span class="muted">The same file in two places, taking its space once. It stays even if the original is deleted. Only on the same disk or pool${dirs ? ' - folders are rebuilt with every file inside linked' : ''}.</span></span></label>
+      <label class="st-radio"><input type="radio" name="lk" value="sym"><span><b>Symbolic link</b><br><span class="muted">A shortcut that points to the original. Works across disks, but breaks if the original is moved or deleted.</span></span></label>
+      <div class="muted">Names already in the other pane are skipped - nothing is replaced. <b>Undo</b> removes the new links; the originals stay as they are.</div>`,
+      [{ label: 'Cancel' }, { label: 'Make links', primary: true, run: async () => {
+        const kind = ($('input[name=lk]:checked', dlg) || {}).value || 'hard';
+        const r = await api('link', { kind, sources: srcs, dest: q.path });
+        const made = r.made.length, bits = [];
+        if (made) bits.push(`${kind === 'hard' ? 'Hard-linked' : 'Linked'} ${made === 1 ? r.made[0] : made.toLocaleString() + ' items'} in ${base(q.path) || q.path}`);
+        if (r.skipped.length) bits.push(`${r.skipped.length === 1 ? r.skipped[0] + ' was' : r.skipped.length + ' were'} already there - skipped`);
+        if (r.failed.length) bits.push(`not linked: ${r.failed.slice(0, 2).join('; ')}${r.failed.length > 2 ? ` (+${r.failed.length - 2} more)` : ''}`);
+        setTimeout(() => { refresh(q, made ? r.made[0] : undefined); if (kind === 'hard') refresh(p); toast(bits.join(' · ') || 'Nothing was linked', !made, r.hist || null); }, 0);
+      } }]);
+  }
   function arcPassword(p, file, path, focusName, why) {
     openDlg(`Password for ${base(file)}`, `<div class="field"><label>Password</label><input type="password" class="arc-pw" autocomplete="off" spellcheck="false"></div>
       <div class="muted">${esc(why && /not right/.test(why) ? 'That password is not right - try again.' : 'This archive is locked with a password.')} It's kept in the server's memory (not on the flash drive) until the next reboot.</div>`,
@@ -20916,14 +21905,14 @@ window.UC_COVER_FONT = [
     ['cursor', 'Cursor row', 'the highlighted row in the active pane'], ['cursor-off', 'Cursor row, other pane', ''], ['sel-count', 'Selection count', '"3 of 120 selected" in the other pane\'s header'],
     ['ok', 'Done', 'finished jobs, success'], ['warn', 'Warning', 'cut items, odd owners'], ['danger', 'Delete', 'delete, errors, tagged items']];
   /* backgrounds, text and lines: only themes that set them (Norton) show them in the editor */
-  const PAL_EXTRA = [['ground', 'Page background', 'behind the panes and bars'], ['surface', 'Panes', 'the file lists and windows'], ['pane-active-bg', 'Active pane', 'the list you are working in'],
+  const PAL_EXTRA = [['ground', 'Page background', 'behind the panes and bars'], ['surface', 'Panes', 'the file lists and windows'], ['pane-active-bg', 'Active pane', 'the list you are working in'], ['frame', 'Active pane frame', 'its outline and header bar - the accent when not set'], ['frame-ink', 'Active pane header text', 'words on that header bar'],
     ['surface-2', 'Bars', 'headers and toolbars'], ['surface-3', 'Buttons', 'buttons and deeper bars'], ['ink', 'Text', 'file names and most text'], ['ink-2', 'Text, softer', 'labels and details'],
     ['muted', 'Text, faint', 'hints and dates'], ['line', 'Lines', 'borders'], ['line-soft', 'Lines, faint', 'row and section dividers'],
     ['cursor-ink', 'Cursor row text', 'the words on the cursor bar'], ['sel-ink', 'Ticked row text', 'the words on ticked rows'],
     ['fk-bg', 'F-key buttons', 'the buttons along the bottom'], ['fk-ink', 'F-key text', 'View, Copy, Delete…'], ['fk-key', 'F-key numbers', 'F2, F5…'], ['fk-line', 'F-key outline', ''], ['fk-danger', 'F-key Delete text', 'the F8 Delete word'],
     ['arc-bg', 'Inside an archive', 'the strip under the pane header'], ['arc-line', 'Inside an archive, outline', 'the strip and the archive in the path bar'], ['input-bg', 'Text boxes', 'text boxes, drop-downs, Go to, the tab name and the path bars'], ['crumb-hover', 'Path bar hover', 'behind a folder name in the path bar'], ['crumb-hover-ink', 'Path bar hover text', 'the folder name you point at'], ['logo-ink', 'Logo', 'the "Commander" in the logo'],
     ['head-ink', 'Headings', 'section titles in Settings, Go to and Keyboard'], ['cols-bg', 'Column titles', 'the NAME / SIZE / DATE row'], ['menu-bg', 'Menu', 'the right-click menu'], ['menu-line', 'Menu outline', '']];
-  const THEMES = {"uncommander": {"name": "unCommander blue", "desc": "the standard look", "light": {"accent": "#008cb4", "accent-soft": "#e0f3f8", "accent-ink": "#ffffff", "cursor": "#fbf3dc", "cursor-off": "#eceef0", "sel-count": "#008cb4", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c"}, "dark": {"accent": "#4c9aff", "accent-soft": "#13233a", "accent-ink": "#07111f", "cursor": "#3b3423", "cursor-off": "#2c3137", "sel-count": "#4c9aff", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a"}}, "unraid": {"name": "unRAID orange", "desc": "unRAID's own orange", "light": {"accent": "#c4510a", "accent-soft": "#fdeee3", "accent-ink": "#ffffff", "cursor": "#fff4e8", "cursor-off": "#efedeb", "sel-count": "#c4510a", "ok": "#2e7a3e", "warn": "#8a6a00", "danger": "#c62828"}, "dark": {"accent": "#ff8c2f", "accent-soft": "#3a2414", "accent-ink": "#1a0c00", "cursor": "#3d2c1c", "cursor-off": "#2d2a27", "sel-count": "#ff8c2f", "ok": "#6cc27e", "warn": "#e8c35a", "danger": "#ff6b5e"}}, "graphite": {"name": "Graphite", "desc": "cool greys, quiet", "light": {"accent": "#3c4450", "accent-soft": "#e8ebef", "accent-ink": "#ffffff", "cursor": "#eef0f3", "cursor-off": "#f4f5f7", "sel-count": "#3c4450", "ok": "#3d7a52", "warn": "#8f6a1c", "danger": "#b4373a"}, "dark": {"accent": "#c5cdd6", "accent-soft": "#2c3138", "accent-ink": "#14171a", "cursor": "#363c44", "cursor-off": "#272b30", "sel-count": "#c5cdd6", "ok": "#7cc596", "warn": "#dcb35c", "danger": "#f07a74"}}, "mono": {"name": "Mono (black & white)", "desc": "pure greyscale, high contrast", "light": {"accent": "#222222", "accent-soft": "#ececec", "accent-ink": "#ffffff", "cursor": "#e4e4e4", "cursor-off": "#f2f2f2", "sel-count": "#222222", "ok": "#4a4a4a", "warn": "#6a6a6a", "danger": "#a32020"}, "dark": {"accent": "#e6e6e6", "accent-soft": "#2e2e2e", "accent-ink": "#111111", "cursor": "#3a3a3a", "cursor-off": "#262626", "sel-count": "#e6e6e6", "ok": "#bdbdbd", "warn": "#a8a8a8", "danger": "#ff7070"}}, "teal": {"name": "Teal", "desc": "calm blue-green", "light": {"accent": "#0381a5", "accent-soft": "#e0f2f7", "accent-ink": "#ffffff", "cursor": "#fbf3dc", "cursor-off": "#edf0f1", "sel-count": "#9b1c1c", "ok": "#2f7d46", "warn": "#946200", "danger": "#b5342c", "arc-bg": "#f7e6f1", "arc-line": "#c25a9c"}, "dark": {"accent": "#3cc4d8", "accent-soft": "#0f2c33", "accent-ink": "#04161a", "cursor": "#3a3424", "cursor-off": "#273034", "sel-count": "#f28b82", "ok": "#5fbe7d", "warn": "#e3b24c", "danger": "#f0736a", "arc-bg": "#3a2234", "arc-line": "#b8609a"}}, "violet": {"name": "Violet", "desc": "soft purple", "light": {"accent": "#6a45d9", "accent-soft": "#efeafd", "accent-ink": "#ffffff", "cursor": "#f7f2ff", "cursor-off": "#efedf3", "sel-count": "#6a45d9", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c"}, "dark": {"accent": "#a98bff", "accent-soft": "#251d3d", "accent-ink": "#140b2b", "cursor": "#2f2840", "cursor-off": "#29262f", "sel-count": "#a98bff", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a"}}, "forest": {"name": "Forest", "desc": "deep green", "light": {"accent": "#1d7a55", "accent-soft": "#e4f4ec", "accent-ink": "#ffffff", "cursor": "#f6f3e4", "cursor-off": "#ecefed", "sel-count": "#1d7a55", "ok": "#1d7a55", "warn": "#8f6a10", "danger": "#b5342c"}, "dark": {"accent": "#4fc995", "accent-soft": "#12291f", "accent-ink": "#04150d", "cursor": "#33331f", "cursor-off": "#262d29", "sel-count": "#4fc995", "ok": "#4fc995", "warn": "#e0ab48", "danger": "#f0736a"}}, "norton": {"name": "Norton", "desc": "an homage", "always": "dark", "light": {"accent": "#33d1d6", "accent-soft": "#1d39aa", "accent-ink": "#04145c", "cursor": "#2cc4c9", "cursor-off": "#2240ae", "sel-count": "#ffff66", "ok": "#66e08a", "warn": "#ffff66", "danger": "#ff8080", "ground": "#08156f", "surface": "#102893", "surface-2": "#0c1f82", "surface-3": "#1a37a8", "line": "#5a6fcc", "line-soft": "#2c45ac", "ink": "#e6e9ff", "ink-2": "#c2c9f5", "muted": "#9aa6e8", "pane-active-bg": "#132c9c", "cursor-ink": "#071470", "sel-ink": "#ffff66", "fk-bg": "#2cc4c9", "fk-ink": "#06123d", "fk-key": "#123a7a", "fk-line": "#2cc4c9", "fk-danger": "#8e0f1c", "input-bg": "#000000", "crumb-hover": "#1a5f66", "logo-ink": "#ffff66", "head-ink": "#ffff66", "cols-bg": "#0d1f6f", "menu-bg": "#08124f", "menu-line": "#000000", "crumb-hover-ink": "#ffffff"}, "dark": {"accent": "#33d1d6", "accent-soft": "#1d39aa", "accent-ink": "#04145c", "cursor": "#2cc4c9", "cursor-off": "#2240ae", "sel-count": "#ffff66", "ok": "#66e08a", "warn": "#ffff66", "danger": "#ff8080", "ground": "#08156f", "surface": "#102893", "surface-2": "#0c1f82", "surface-3": "#1a37a8", "line": "#5a6fcc", "line-soft": "#2c45ac", "ink": "#e6e9ff", "ink-2": "#c2c9f5", "muted": "#9aa6e8", "pane-active-bg": "#132c9c", "cursor-ink": "#071470", "sel-ink": "#ffff66", "fk-bg": "#2cc4c9", "fk-ink": "#06123d", "fk-key": "#123a7a", "fk-line": "#2cc4c9", "fk-danger": "#8e0f1c", "input-bg": "#000000", "crumb-hover": "#1a5f66", "logo-ink": "#ffff66", "head-ink": "#ffff66", "cols-bg": "#0d1f6f", "menu-bg": "#08124f", "menu-line": "#000000", "crumb-hover-ink": "#ffffff"}}};
+  const THEMES = {"uncommander": {"name": "unCommander blue", "desc": "the standard look", "light": {"accent": "#008cb4", "accent-soft": "#e0f3f8", "accent-ink": "#ffffff", "cursor": "#fbf3dc", "cursor-off": "#eceef0", "sel-count": "#008cb4", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c"}, "dark": {"accent": "#4c9aff", "accent-soft": "#13233a", "accent-ink": "#07111f", "cursor": "#3b3423", "cursor-off": "#2c3137", "sel-count": "#4c9aff", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a"}}, "unraid": {"name": "unRAID orange", "desc": "unRAID's own orange", "light": {"accent": "#c4510a", "accent-soft": "#fdeee3", "accent-ink": "#ffffff", "cursor": "#fff4e8", "cursor-off": "#efedeb", "sel-count": "#c4510a", "ok": "#2e7a3e", "warn": "#8a6a00", "danger": "#c62828"}, "dark": {"accent": "#ff8c2f", "accent-soft": "#3a2414", "accent-ink": "#1a0c00", "cursor": "#3d2c1c", "cursor-off": "#2d2a27", "sel-count": "#ff8c2f", "ok": "#6cc27e", "warn": "#e8c35a", "danger": "#ff6b5e"}}, "unraidgrey": {"name": "unRAID orange", "desc": "with a grey frame", "light": {"accent": "#c4510a", "accent-soft": "#fdeee3", "accent-ink": "#ffffff", "cursor": "#fff4e8", "cursor-off": "#efedeb", "sel-count": "#c4510a", "ok": "#2e7a3e", "warn": "#8a6a00", "danger": "#c62828", "frame": "#686d74", "frame-ink": "#ffffff"}, "dark": {"accent": "#ff8c2f", "accent-soft": "#3a2414", "accent-ink": "#1a0c00", "cursor": "#3d2c1c", "cursor-off": "#2d2a27", "sel-count": "#ff8c2f", "ok": "#6cc27e", "warn": "#e8c35a", "danger": "#ff6b5e", "frame": "#555a61", "frame-ink": "#f2f2f2"}}, "graphite": {"name": "Graphite", "desc": "cool greys, quiet", "light": {"accent": "#3c4450", "accent-soft": "#e8ebef", "accent-ink": "#ffffff", "cursor": "#eef0f3", "cursor-off": "#f4f5f7", "sel-count": "#3c4450", "ok": "#3d7a52", "warn": "#8f6a1c", "danger": "#b4373a"}, "dark": {"accent": "#c5cdd6", "accent-soft": "#2c3138", "accent-ink": "#14171a", "cursor": "#363c44", "cursor-off": "#272b30", "sel-count": "#c5cdd6", "ok": "#7cc596", "warn": "#dcb35c", "danger": "#f07a74"}}, "mono": {"name": "Mono (black & white)", "desc": "pure greyscale, high contrast", "light": {"accent": "#222222", "accent-soft": "#ececec", "accent-ink": "#ffffff", "cursor": "#e4e4e4", "cursor-off": "#f2f2f2", "sel-count": "#222222", "ok": "#4a4a4a", "warn": "#6a6a6a", "danger": "#a32020"}, "dark": {"accent": "#e6e6e6", "accent-soft": "#2e2e2e", "accent-ink": "#111111", "cursor": "#3a3a3a", "cursor-off": "#262626", "sel-count": "#e6e6e6", "ok": "#bdbdbd", "warn": "#a8a8a8", "danger": "#ff7070"}}, "teal": {"name": "Teal", "desc": "calm blue-green", "light": {"accent": "#0381a5", "accent-soft": "#e0f2f7", "accent-ink": "#ffffff", "cursor": "#fbf3dc", "cursor-off": "#edf0f1", "sel-count": "#9b1c1c", "ok": "#2f7d46", "warn": "#946200", "danger": "#b5342c", "arc-bg": "#f7e6f1", "arc-line": "#c25a9c"}, "dark": {"accent": "#3cc4d8", "accent-soft": "#0f2c33", "accent-ink": "#04161a", "cursor": "#3a3424", "cursor-off": "#273034", "sel-count": "#f28b82", "ok": "#5fbe7d", "warn": "#e3b24c", "danger": "#f0736a", "arc-bg": "#3a2234", "arc-line": "#b8609a"}}, "mist": {"name": "Mist", "desc": "soft grey, a little steel blue", "light": {"accent": "#46698f", "accent-soft": "#e5ecf4", "accent-ink": "#ffffff", "cursor": "#e7e3f0", "cursor-off": "#f0f1f3", "sel-count": "#b4410f", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c", "arc-bg": "#e8f4ee", "arc-line": "#3f9a6e", "ground": "#f0f1f3", "surface": "#fbfbfc", "surface-2": "#f4f5f7", "surface-3": "#e8eaee", "line": "#d8dce1", "line-soft": "#e6e8ec", "ink": "#22262b", "ink-2": "#454b52", "muted": "#737a83", "cols-bg": "#eceef1", "fk-key": "#46698f"}, "dark": {"accent": "#8fb0d6", "accent-soft": "#1e2a38", "accent-ink": "#0d1622", "cursor": "#2d2a3a", "cursor-off": "#24272c", "sel-count": "#f0905a", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a", "arc-bg": "#1c2f27", "arc-line": "#4fae80", "ground": "#16181b", "surface": "#1d2024", "surface-2": "#22262b", "surface-3": "#2a2e34", "line": "#363b42", "line-soft": "#2b2f35", "ink": "#e6e8eb", "ink-2": "#c3c8ce", "muted": "#8d949c", "cols-bg": "#22262b", "fk-key": "#8fb0d6"}}, "violet": {"name": "Violet", "desc": "soft purple", "light": {"accent": "#6a45d9", "accent-soft": "#efeafd", "accent-ink": "#ffffff", "cursor": "#f7f2ff", "cursor-off": "#efedf3", "sel-count": "#6a45d9", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c"}, "dark": {"accent": "#a98bff", "accent-soft": "#251d3d", "accent-ink": "#140b2b", "cursor": "#2f2840", "cursor-off": "#29262f", "sel-count": "#a98bff", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a"}}, "forest": {"name": "Forest", "desc": "deep green", "light": {"accent": "#1d7a55", "accent-soft": "#e4f4ec", "accent-ink": "#ffffff", "cursor": "#f6f3e4", "cursor-off": "#ecefed", "sel-count": "#1d7a55", "ok": "#1d7a55", "warn": "#8f6a10", "danger": "#b5342c"}, "dark": {"accent": "#4fc995", "accent-soft": "#12291f", "accent-ink": "#04150d", "cursor": "#33331f", "cursor-off": "#262d29", "sel-count": "#4fc995", "ok": "#4fc995", "warn": "#e0ab48", "danger": "#f0736a"}}, "norton": {"name": "Norton", "desc": "an homage", "always": "dark", "light": {"accent": "#62c3cb", "accent-soft": "#2f5086", "accent-ink": "#0b1a33", "cursor": "#3e9aa3", "cursor-off": "#2f5086", "sel-count": "#f0d96a", "ok": "#7ed49b", "warn": "#f0d96a", "danger": "#ff8f8f", "ground": "#19294f", "surface": "#23386b", "surface-2": "#1e3064", "surface-3": "#2b4579", "line": "#445c95", "line-soft": "#304982", "ink": "#e3e8f4", "ink-2": "#c0c9df", "muted": "#8f9cc0", "pane-active-bg": "#253c72", "cursor-ink": "#0b1a33", "sel-ink": "#f0d96a", "fk-bg": "#3e9aa3", "fk-ink": "#0b1a33", "fk-key": "#1c4770", "fk-line": "#3e9aa3", "fk-danger": "#8e1a26", "input-bg": "#142040", "crumb-hover": "#25536a", "crumb-hover-ink": "#ffffff", "logo-ink": "#f0d96a", "head-ink": "#f0d96a", "cols-bg": "#1e3064", "menu-bg": "#1a2c57", "menu-line": "#0a1328", "arc-bg": "#2a2a55", "arc-line": "#9d8cf0"}, "dark": {"accent": "#62c3cb", "accent-soft": "#2f5086", "accent-ink": "#0b1a33", "cursor": "#3e9aa3", "cursor-off": "#2f5086", "sel-count": "#f0d96a", "ok": "#7ed49b", "warn": "#f0d96a", "danger": "#ff8f8f", "ground": "#19294f", "surface": "#23386b", "surface-2": "#1e3064", "surface-3": "#2b4579", "line": "#445c95", "line-soft": "#304982", "ink": "#e3e8f4", "ink-2": "#c0c9df", "muted": "#8f9cc0", "pane-active-bg": "#253c72", "cursor-ink": "#0b1a33", "sel-ink": "#f0d96a", "fk-bg": "#3e9aa3", "fk-ink": "#0b1a33", "fk-key": "#1c4770", "fk-line": "#3e9aa3", "fk-danger": "#8e1a26", "input-bg": "#142040", "crumb-hover": "#25536a", "crumb-hover-ink": "#ffffff", "logo-ink": "#f0d96a", "head-ink": "#f0d96a", "cols-bg": "#1e3064", "menu-bg": "#1a2c57", "menu-line": "#0a1328", "arc-bg": "#2a2a55", "arc-line": "#9d8cf0"}}};
   function palTheme(base, mine) {
     if (base && base.startsWith('my:')) { const t = (mine || []).find(x => 'my:' + x.name === base); if (t) return t; }
     return THEMES[base] || THEMES.uncommander;
@@ -20955,7 +21944,7 @@ window.UC_COVER_FONT = [
   async function saveSettings(next) {
     const r = await api('save_settings', { settings: next });
     const treeWas = !!SET.tree;
-    SET = r.settings; applyPalette(SET.palette); applyLook(SET.css); applyToolBtns(); renderBookmarks(); applyPractice(); applySys(false); watchArm(); playerSetting(); plFilesAt = 0;
+    SET = r.settings; PROFILES = Array.isArray(SET.profiles) ? SET.profiles : []; tabShowName(); winDraw(); tabSay({ t: 'prof', list: PROFILES }); applyPalette(SET.palette); applyLook(SET.css); applyToolBtns(); renderBookmarks(); applyPractice(); applySys(false); watchArm(); playerSetting(); plFilesAt = 0;
     if (watchOn()) panes.forEach(p => { if (p.mode === 'dir' && !p.sig) refresh(p); });   // fetch a starting fingerprint
     if (treeWas !== !!SET.tree) panes.forEach(p => { if (p.mode === 'dir') { if (!SET.tree) { p.tree = new Map(); saveTree(p); } applySort(p); } });
     drawClip();
@@ -21175,7 +22164,7 @@ window.UC_COVER_FONT = [
     const SN = w.sonarr || (w.sonarr = {});
     const LD = w.lidarr || (w.lidarr = {});
     let savedOk = false;
-    const tabs = [['gen', 'General'], ['bm', 'Shortcuts'], ['look', 'Look & sound'], ['safe', 'Safety & trash'], ['tools', 'Tools'], ['keys', 'Keyboard']];
+    const tabs = [['gen', 'General'], ['bm', 'Shortcuts'], ['prof', 'Profiles'], ['look', 'Look & sound'], ['safe', 'Safety & trash'], ['tools', 'Tools'], ['keys', 'Keyboard']];
     const sc = (k, label) => `<label class="chk"><input type="checkbox" data-s="${k}" ${w.sounds[k] ? 'checked' : ''}> ${label}</label>`;
     openDlg(only ? 'Tools' : root.dataset.version ? `Settings · version ${root.dataset.version}` : 'Settings', `
       <div class="st-tabs"${only ? ' hidden' : ''}>${tabs.map(([k, l]) => `<button class="st-tab" data-tab="${k}">${l}</button>`).join('')}</div>
@@ -21187,6 +22176,13 @@ window.UC_COVER_FONT = [
         </div>
         <label class="st-radio"><input type="checkbox" class="st-menushow" ${w.menu_show !== false ? 'checked' : ''}><span><b>Show unCommander in unRAID's top menu bar</b><br>
           <span class="muted">Off: no entry in the menu bar - open it from its icon in unRAID's Settings &gt; User Utilities, or in its own tab. Reload the page after saving to see the change.</span></span></label>
+        <div class="st-sub"><b>Clicking unCommander in unRAID's top menu</b></div>
+        <div class="st-newtab">
+          <label class="st-radio"><input type="radio" name="st-newtab" value="" ${!w.menu_newtab ? 'checked' : ''}><span><b>Opens it here</b> <span class="muted">· in this tab, inside unRAID - the usual way</span></span></label>
+          <label class="st-radio"><input type="radio" name="st-newtab" value="unraid" ${w.menu_newtab === 'unraid' ? 'checked' : ''}><span><b>Opens a new tab, with unRAID's menu</b> <span class="muted">· unCommander inside unRAID, in a tab of its own</span></span></label>
+          <label class="st-radio"><input type="radio" name="st-newtab" value="solo" ${w.menu_newtab === 'solo' ? 'checked' : ''}><span><b>Opens a new tab, without unRAID's menu</b> <span class="muted">· the whole window for unCommander</span></span></label>
+          <div class="muted">With a new tab, the unRAID page stays where it was, and clicking again goes back to that tab. Reload the unRAID page after saving.</div>
+        </div>
         <div class="field"><label>Name in the unRAID menu bar</label>
           <input type="text" class="st-menu" maxlength="30" value="${esc(w.menu_name || 'unCommander')}" placeholder="unCommander"></div>
         <div class="muted">The label of unCommander's entry in the unRAID top menu. Reload the page after saving to see it there. Leave it empty to go back to "unCommander".</div>
@@ -21225,7 +22221,7 @@ window.UC_COVER_FONT = [
         <label class="st-radio"><input type="checkbox" class="st-player" ${w.player !== false ? 'checked' : ''}><span><b>Music player</b><br>
           <span class="muted">A player at the bottom of unCommander that plays one playlist: right-click songs, albums or artists and pick <b>Play</b> or <b>Add to playlist</b>, or open a playlist file. The ♪ button at the top shows and hides it. Off: no player and no playlist editor - songs still preview with F2 or a double-click.</span></span></label>
         <div class="field"><label>Playlist folders</label>
-          <textarea class="st-pldirs" rows="3" spellcheck="false" placeholder="/mnt/user/Media/Music/Playlists">${esc((w.pldirs || []).join('\n'))}</textarea></div>
+          <textarea class="st-pldirs" rows="3" spellcheck="false" placeholder="Enter path here…">${esc((w.pldirs || []).join('\n'))}</textarea></div>
         <div class="muted">One folder per line. The playlists in them are listed in the player and in the editor's Open… list, and Save as starts in the first one.</div>
       </div>
 
@@ -21294,6 +22290,11 @@ window.UC_COVER_FONT = [
         <div class="muted">Buttons in the bar under the top row. Tap one to open that folder in the active pane.</div>
         <div class="st-bms"></div>
         <div class="st-row"><button class="uc-btn st-add-cur">＋ Add the active pane's folder</button><button class="uc-btn st-add-blank">＋ Add blank</button></div>
+      </div>
+
+      <div class="st-panel" data-panel="prof">
+        <div class="muted">A profile is a layout you come back to: both panes' folders, the active pane, the sort, hidden files, each pane's columns, list or Gallery, open tree folders, ticks, the filter, the music view and the player. To make one, set the panes up as you want them, click the box next to the <b>New tab</b> button, and choose <b>Save what's open now as a new profile</b>. Change one the same way: open it, change the panes, then <b>Update</b> from that box. Here you can rename, reorder and remove them. They're kept on the server, so every browser has them.</div>
+        <div class="st-profs"></div>
       </div>
 
       <div class="st-panel" data-panel="size">
@@ -21376,7 +22377,8 @@ window.UC_COVER_FONT = [
       <div class="st-panel" data-panel="about">
         <img class="st-logo" src="/plugins/uncommander/images/logo.png" alt="unCommander - two-pane file manager for unRAID">
         <div class="st-about">unCommander${root.dataset.version ? ` <span class="mono">${esc(root.dataset.version)}</span>` : ''} - source code, the full user guide, and a place to report bugs or ask for features:
-          <a href="https://github.com/hernandito/unCommander" target="_blank" rel="noopener">github.com/hernandito/unCommander ↗</a></div>
+          <a href="https://github.com/hernandito/unCommander" target="_blank" rel="noopener">github.com/hernandito/unCommander ↗</a>
+          <div class="st-guide"><a href="https://github.com/hernandito/unCommander/blob/main/docs/USER-GUIDE.md" target="_blank" rel="noopener">📖 User guide ↗</a> <span class="muted">- every feature, step by step</span></div></div>
         <a class="st-bmc" href="https://www.buymeacoffee.com/hernandito" target="_blank" rel="noopener" title="Like unCommander? Buy the author a coffee">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path class="cup" d="M4.5 8.5h12.2l-1.3 10.2a2 2 0 0 1-2 1.8H7.8a2 2 0 0 1-2-1.8z"/><path class="rim" d="M3.6 6.3h14v2.2h-14z"/><path class="steam" d="M8.6 4.6c0-1 .9-1.1.9-2.1M11.6 4.6c0-1 .9-1.1.9-2.1"/><path class="handle" d="M16.6 10.3h1.6a2.2 2.2 0 0 1 0 4.4h-2.1"/></svg>
           Buy me a coffee</a>
@@ -21520,6 +22522,7 @@ window.UC_COVER_FONT = [
         w.player = $('.st-player', dlg).checked;
         w.pldirs = $('.st-pldirs', dlg).value.split('\n').map(x => x.trim().replace(/\/+$/, '')).filter(Boolean);
         w.menu_show = $('.st-menushow', dlg).checked;
+        w.menu_newtab = ($('input[name=st-newtab]:checked', dlg) || {}).value || '';
         store.set('ctxOff', !$('.st-ctxmenu', dlg).checked);
         store.set('rtick', $('.st-rtick', dlg).checked);
         store.set('typeMode', ($('input[name=st-type]:checked', dlg) || {}).value === 'filter' ? 'filter' : 'jump');
@@ -21543,7 +22546,12 @@ window.UC_COVER_FONT = [
         w.lidarr = rdRead($('.rd-box[data-app="lidarr"]', dlg));
         const oldMenu = SET.menu_name;
         w.menu_name = $('.st-menu', dlg).value.trim();
+        /* profiles: an empty name keeps the old one, two the same get a number; tabs showing a renamed one follow it */
+        const ren = {}, taken = new Set();
+        w.profiles.forEach(x => { let n = (x.name || '').trim().replace(/\s+/g, ' ').slice(0, 40) || x.was || 'Profile', k = 2; const b0 = n;
+          while (taken.has(n.toLowerCase())) n = `${b0.slice(0, 36)} ${k++}`; taken.add(n.toLowerCase()); x.name = n; if (x.was && x.was !== n) ren[x.was] = n; delete x.was; });
         savedOk = true; await saveSettings(w);
+        if (Object.keys(ren).length) profRenamed(ren);
         toast(SET.menu_name !== oldMenu ? 'Saved — reload the page to see the new menu name' : quiet ? 'Tools settings saved' : 'Settings saved');
     }
     document.activeElement && document.activeElement.blur();
@@ -21556,7 +22564,7 @@ window.UC_COVER_FONT = [
     $('.fs-reset', dlg).addEventListener('click', () => fsSet(100));
 
     /* Four tabs, each grouping related sections under a small heading. */
-    const GROUP = { colors: 'look', music: 'gen', gen: 'gen', tree: 'gen', video: 'gen', touch: 'gen', jobs: 'gen', watch: 'gen', about: 'gen', bm: 'bm', size: 'look', look: 'look', hl: 'look', snd: 'look', safe: 'safe', sys: 'safe', trash: 'safe', tools: 'tools', keys: 'keys' };
+    const GROUP = { colors: 'look', music: 'gen', gen: 'gen', tree: 'gen', video: 'gen', touch: 'gen', jobs: 'gen', watch: 'gen', about: 'gen', bm: 'bm', prof: 'prof', size: 'look', look: 'look', hl: 'look', snd: 'look', safe: 'safe', sys: 'safe', trash: 'safe', tools: 'tools', keys: 'keys' };
     $$('.rd-box[data-app]', dlg).forEach(box => rdWire(box, w));
     /* Function keys: a preset fills the boxes; changing a box makes it "My own" */
     $$('input[name=st-fkp]', dlg).forEach(r => r.addEventListener('change', () => { const pr = FK_PRESETS[r.value]; if (pr) $$('select[data-fk]', dlg).forEach(x => { x.value = pr[2][x.dataset.fk] || ''; }); }));
@@ -21620,8 +22628,8 @@ window.UC_COVER_FONT = [
         if (!vb.dataset.done && r.state === 'ready') {
           vb.dataset.done = '1';
           const lab = { cpu: 'the CPU', nvidia: 'the NVIDIA graphics', vaapi: 'the Intel/AMD graphics' };
-          const cur = w.vconv || 'auto', ch = [['auto', 'Automatic', 'the graphics when they work, else the CPU - recommended'], ['off', 'Off', "videos the browser can't show won't play"], ['cpu', 'Use the CPU', 'works everywhere; heavy']].concat((r.gpus || []).map(gp => [gp.id, `Use the ${gp.label}`, gp.id === 'nvidia' ? 'needs the Nvidia Driver plugin' : '']));
-          vb.innerHTML = ch.map(([v, l, d]) => `<label class="st-radio st-vc"><input type="radio" name="st-vconv" value="${v}" ${cur === v ? 'checked' : ''}><span><b>${esc(l)}</b>${d ? ` <span class="muted">· ${esc(d)}</span>` : ''}${v !== 'off' ? ` <button type="button" class="uc-btn st-vtest" data-m="${v}">Test</button> <span class="st-vres">${v === 'auto' && r.vauto ? `<span class="st-ok">✓ using ${lab[r.vauto]}</span>` : ''}</span>` : ''}</span></label>`).join('')
+          const cur = w.vconv || 'auto', ch = [['auto', 'Automatic', 'the graphics when they work, else the CPU - recommended'], ['off', 'Off', "videos the browser can't show won't play"], ['cpu', 'Use the CPU', 'works everywhere; heavy']].concat((r.gpus || []).map(gp => [gp.id, `Use the ${gp.label}`, gp.id === 'nvidia' ? 'needs the Nvidia Driver plugin' : '', gp.nolib]));
+          vb.innerHTML = ch.map(([v, l, d, nolib]) => nolib ? `<label class="st-radio st-vc st-vc-no"><input type="radio" name="st-vconv" value="${v}" disabled><span><b>${esc(l)}</b> <span class="muted">· not available</span><br><span class="st-vc-why">This server has ${esc(l.replace(/^Use the /, ''))}, but unRAID doesn't include the VA-API video drivers it needs, so it can't convert video here. ${cur === v ? '<b>Videos use the CPU instead</b> - pick Use the CPU or Automatic to stop seeing this.' : 'Use the CPU or Automatic instead.'}</span></span></label>` : `<label class="st-radio st-vc"><input type="radio" name="st-vconv" value="${v}" ${cur === v ? 'checked' : ''}><span><b>${esc(l)}</b>${d ? ` <span class="muted">· ${esc(d)}</span>` : ''}${v !== 'off' ? ` <button type="button" class="uc-btn st-vtest" data-m="${v}">Test</button> <span class="st-vres">${v === 'auto' && r.vauto ? `<span class="st-ok">✓ using ${lab[r.vauto]}</span>` : ''}</span>` : ''}</span></label>`).join('')
             + ((r.gpus || []).length ? '' : '<div class="muted">No NVIDIA, Intel or AMD graphics were found on this server - Automatic uses the CPU.</div>');
           vb.addEventListener('click', async e => {
             const b = e.target.closest('.st-vtest'); if (!b) return; e.preventDefault();
@@ -21695,6 +22703,29 @@ window.UC_COVER_FONT = [
     });
     $('.st-add-blank', dlg).addEventListener('click', () => { w.bookmarks.push({ label: '', path: '' }); drawBms(); $('.st-bm:last-child .st-label', list).focus(); });
 
+    /* profiles: rename, reorder, remove (they're made and updated from the box by the New tab button) */
+    if (!Array.isArray(w.profiles)) w.profiles = [];
+    w.profiles.forEach(x => { x.was = x.name; });
+    const plist = $('.st-profs', dlg);
+    const drawProfs = () => {
+      plist.innerHTML = w.profiles.length ? w.profiles.map((x, i) => `
+        <div class="st-prof" data-i="${i}">
+          <input type="text" class="st-pname" value="${esc(x.name)}" placeholder="Name" maxlength="40" spellcheck="false">
+          <span class="st-psub" title="${esc(x.panes.map(q => q.path).join('  ⇄  '))}">${esc(profSub(x))}</span>
+          <button class="uc-btn" data-mv="-1" title="Move up" ${i ? '' : 'disabled'}>🠉</button>
+          <button class="uc-btn" data-mv="1" title="Move down" ${i < w.profiles.length - 1 ? '' : 'disabled'}>🠋</button>
+          <button class="uc-btn danger" data-del title="Remove">✕</button>
+        </div>`).join('') : '<div class="uc-empty">No profiles yet.</div>';
+    };
+    drawProfs();
+    plist.addEventListener('input', e => { const row = e.target.closest('.st-prof'); if (row && e.target.matches('.st-pname')) w.profiles[+row.dataset.i].name = e.target.value; });
+    plist.addEventListener('click', e => {
+      const row = e.target.closest('.st-prof'); if (!row) return;
+      const i = +row.dataset.i, mv = e.target.closest('[data-mv]');
+      if (mv) { const j = i + +mv.dataset.mv; [w.profiles[i], w.profiles[j]] = [w.profiles[j], w.profiles[i]]; drawProfs(); }
+      if (e.target.closest('[data-del]')) { w.profiles.splice(i, 1); drawProfs(); }
+    });
+
     /* appearance */
     const ta = $('.st-css', dlg);
     ta.addEventListener('input', () => { w.css = ta.value; applyLook(w.css); });
@@ -21758,7 +22789,7 @@ window.UC_COVER_FONT = [
   }
   function tabForget(id) {
     if (id === 'main') return;
-    for (const k of [...TAB_KEYS, 'tabname']) { try { localStorage.removeItem(tabKey(k, id)); } catch (e) {} }
+    for (const k of [...TAB_KEYS, 'tabname', 'profile', 'profgo']) { try { localStorage.removeItem(tabKey(k, id)); } catch (e) {} }
   }
   /* closed tabs are kept a week (Reopen closed tab), at most 12 */
   function tabPrune() {
@@ -21777,22 +22808,31 @@ window.UC_COVER_FONT = [
     if (!extra || !('closed' in extra)) delete r[TAB].closed;
     tabRegSet(r);
   }
-  /* the name: what you called it, else the active pane's folder (for the browser's tab and Reopen) */
+  /* the name: the profile it shows, else what you called it, else the active pane's folder (for the browser's tab and Reopen) */
+  const tabProf = () => { const n = store.get('profile', ''); return n && PROFILES.some(x => x.name === n) ? n : ''; };
   function tabName() {
-    const own = store.get('tabname', '');
+    const own = tabProf() || store.get('tabname', '');
     if (own) return own;
     const p = A(); return (p && p.mode === 'dir' ? base(p.path) || '/' : '') || 'unCommander';
   }
   const tabEl = $('.uc-tabname'), tabBtn = $('.uc-tabbtn');
   const tabsAlive = new Map();             // the other unCommander tabs open in this browser: id -> last heard
-  /* the box next to the New tab button shows the name you gave this tab (or "tab name…");
-   * the browser's tab shows that name, else the active folder - kept up to date as you move */
+  /* the box next to the New tab button: the profile this tab shows (a dot when it has changed
+   * since), else the name you gave the tab, else the active folder. Click it for the profiles.
+   * The browser's tab shows the same - kept up to date as you move */
+  let tabElWas = '';
   function tabShowName() {
-    const own = store.get('tabname', '');
-    if (tabEl) { tabEl.textContent = own || 'tab name…'; tabEl.classList.toggle('empty', !own); tabEl.title = own ? `This tab: ${own} - click to rename it` : 'Give this tab a name'; }
-    const t = own || `uC · ${tabName()}`;
+    const prof = tabProf(), own = prof || store.get('tabname', ''), n = tabName();
+    if (tabEl) {
+      const drift = !!prof && profChanged();
+      const html = `<span class="tn-t">${esc(n)}</span>${drift ? '<span class="tn-dot" aria-label="changed"></span>' : ''}<span class="tn-v" aria-hidden="true">▾</span>`;
+      if (html !== tabElWas) { tabElWas = html; tabEl.innerHTML = html; if (!booting) fitBar(); }
+      tabEl.classList.toggle('auto', !own); tabEl.classList.toggle('prof', !!prof);
+      tabEl.title = prof ? `Profile: ${prof}${drift ? ' - changed since it was saved' : ''}. Click for profiles` : 'Profiles, and this tab\'s name';
+    }
+    const t = own || `uC · ${n}`;
     if (document.title !== t) document.title = t;
-    if (winTabs && winStrip) { const on = $('.wt.on .wt-n', winStrip), n = own || tabName(); if (on && on.textContent !== n) winDraw(); }
+    if (winTabs && winStrip) { const on = $('.wt.on .wt-n', winStrip); if (on && on.textContent !== n) winDraw(); }
   }
   let tabCh = null;
   try { tabCh = new BroadcastChannel('uncommander'); } catch (e) {}
@@ -21813,6 +22853,8 @@ window.UC_COVER_FONT = [
       tabTouch(); tabShowName();
     }
     if (m.t === 'bye') { tabsAlive.delete(m.from); tabShowName(); }
+    /* profiles saved or changed in another tab */
+    if (m.t === 'prof' && m.from !== TAB && Array.isArray(m.list)) { PROFILES = m.list; SET.profiles = PROFILES; tabShowName(); winDraw(); }
     /* someone pressed play in another tab: this one goes quiet */
     if (m.t === 'play' && m.from !== TAB) $$('audio, video').forEach(a => { if (!a.paused) a.pause(); });
   };
@@ -21837,10 +22879,11 @@ window.UC_COVER_FONT = [
   });
   /* open a new browser tab or a small window, where this one is */
   /* a new tab's layout (a copy of this one's) and its address */
-  function tabPrep(kind) {
+  function tabPrep(kind, prof) {
     const id = tabNew();
     tabCopy(TAB, id);
     try { localStorage.removeItem(tabKey('tabname', id)); } catch (e) {}
+    profPrime(id, prof);
     const r = tabReg(); r[id] = { seen: Date.now(), kind }; tabRegSet(r);
     const withUnraid = store.get('tabshow', 'solo') === 'unraid';
     return { id, url: withUnraid ? `/UnCommander?uctab=${id}` : `/plugins/uncommander/uncommander.php?uctab=${id}` };
@@ -21856,7 +22899,7 @@ window.UC_COVER_FONT = [
   }
   function tabRename() {
     openDlg('Name this tab', `<div class="field"><label>Name</label><input type="text" class="tn-in" value="${esc(store.get('tabname', ''))}" placeholder="tab name…" spellcheck="false" maxlength="40"></div>
-      <div class="muted">Shown next to the New tab button and on the browser's tab. Empty: no name - the browser's tab shows the active folder.</div>`,
+      <div class="muted">Shown in the box next to the New tab button and on the browser's tab, when the tab isn't showing a profile. Empty: no name - they show the active folder.</div>`,
       [{ label: 'Cancel' }, { label: 'Save', primary: true, run: () => { store.set('tabname', $('.tn-in', dlg).value.trim()); tabTouch(); tabShowName(); winDraw(); } }]);
   }
 
@@ -21872,7 +22915,7 @@ window.UC_COVER_FONT = [
   let winTabs = IN_WIN ? winGet() : null;
   if (winTabs) { if (!winTabs.tabs.includes(TAB)) winTabs.tabs.push(TAB); winTabs.cur = TAB; winSet(winTabs); }
   let winStrip = null, winBusy = false;
-  const winLabel = id => { try { const own = JSON.parse(localStorage.getItem(tabKey('tabname', id)) || '""'); if (own) return [own, true]; const p = JSON.parse(localStorage.getItem(tabKey('active', id)) || '0'); const path = JSON.parse(localStorage.getItem(tabKey('path' + (p ? 1 : 0), id)) || '""'); return [base(path) || '/', false]; } catch (e) { return ['unCommander', false]; } };
+  const winLabel = id => { try { const pf = JSON.parse(localStorage.getItem(tabKey('profile', id)) || '""'), own = (pf && PROFILES.some(x => x.name === pf) ? pf : '') || JSON.parse(localStorage.getItem(tabKey('tabname', id)) || '""'); if (own) return [own, true]; const p = JSON.parse(localStorage.getItem(tabKey('active', id)) || '0'); const path = JSON.parse(localStorage.getItem(tabKey('path' + (p ? 1 : 0), id)) || '""'); return [base(path) || '/', false]; } catch (e) { return ['unCommander', false]; } };
   function winDraw() {
     if (!winTabs) return;
     if (!winStrip) {
@@ -21882,9 +22925,16 @@ window.UC_COVER_FONT = [
         if (e.target.closest('.wt-add')) return winAdd();
         const t = e.target.closest('[data-wt]'); if (t && t.dataset.wt !== TAB) winSwitch(t.dataset.wt);
       });
+      /* right-click the +: a new tab with one of the profiles */
+      winStrip.addEventListener('contextmenu', e => {
+        const a = e.target.closest('.wt-add'); if (!a) return;
+        e.preventDefault(); const b = a.getBoundingClientRect();
+        showMenu(b.left, b.bottom + 4, 'New tab with a profile', PROFILES.length ? PROFILES.map(x => ({ label: x.name, ic: 'pane', sub: profSub(x), run: () => winAdd(x.name) }))
+          : [{ label: 'No profiles yet - save one from the box next to the New tab button', off: true }]);
+      });
       winStrip.addEventListener('dblclick', e => { const t = e.target.closest('[data-wt]'); if (t && t.dataset.wt === TAB) tabRename(); });
     }
-    winStrip.innerHTML = winTabs.tabs.map(id => { const [n, own] = id === TAB ? [store.get('tabname', '') || tabName(), !!store.get('tabname', '')] : winLabel(id); return `<div class="wt${id === TAB ? ' on' : ''}${own ? '' : ' auto'}" data-wt="${esc(id)}" title="${id === TAB ? 'This tab - double-click to name it' : 'Switch to this tab'}"><span class="wt-n">${esc(n)}</span>${winTabs.tabs.length > 1 ? `<button type="button" class="wt-x" data-wx="${esc(id)}" title="Close this tab" aria-label="Close">✕</button>` : ''}</div>`; }).join('')
+    winStrip.innerHTML = winTabs.tabs.map(id => { const [n, own] = id === TAB ? [tabName(), !!(tabProf() || store.get('tabname', ''))] : winLabel(id); return `<div class="wt${id === TAB ? ' on' : ''}${own ? '' : ' auto'}" data-wt="${esc(id)}" title="${id === TAB ? 'This tab - double-click to name it' : 'Switch to this tab'}"><span class="wt-n">${esc(n)}</span>${winTabs.tabs.length > 1 ? `<button type="button" class="wt-x" data-wx="${esc(id)}" title="Close this tab" aria-label="Close">✕</button>` : ''}</div>`; }).join('')
       + '<button type="button" class="wt-add" title="New tab, where you are now" aria-label="New tab">+</button>';
   }
   /* this tab's saved layout, put into the panes */
@@ -21910,17 +22960,19 @@ window.UC_COVER_FONT = [
       winTabs.cur = id; winSet(winTabs); winDraw();
       tabTouch(); tabShowName();
       await winOpenLayout();
+      await profGo();
     } finally { winBusy = false; winDraw(); }
   }
-  function winAdd() {
+  function winAdd(prof) {
     const id = tabNew(); tabCopy(TAB, id);
     try { localStorage.removeItem(tabKey('tabname', id)); } catch (e) {}
+    profPrime(id, prof);
     winTabs.tabs.splice(winTabs.tabs.indexOf(TAB) + 1, 0, id); winSet(winTabs);
     winSwitch(id);
   }
   function winClose(id) {
     const i = winTabs.tabs.indexOf(id); if (i < 0 || winTabs.tabs.length < 2) return;
-    const name = (id === TAB ? [store.get('tabname', '') || tabName()] : winLabel(id))[0];
+    const name = (id === TAB ? [tabName()] : winLabel(id))[0];
     winTabs.tabs.splice(i, 1); winSet(winTabs);
     const undo = async () => {
       if (!winTabs.tabs.includes(id)) { winTabs.tabs.splice(Math.min(i, winTabs.tabs.length), 0, id); winSet(winTabs); }
@@ -21932,6 +22984,140 @@ window.UC_COVER_FONT = [
   }
   if (winTabs) { root.classList.add('uc-inwin'); winDraw(); }
 
+  /* ---------- profiles ----------
+   * A profile is a named layout: both panes' folders, which pane is active, the sort, hidden
+   * files, each pane's columns, list or Gallery, and the filter. You make one by setting the
+   * panes up as you want them and saving from the box next to the New tab button; it's kept
+   * on the server (settings.json), so every browser and device has the same ones. Loading one
+   * puts it in this tab; New tab, New window and the tab row's + can start with one.
+   * It also keeps the open tree folders, the ticks and the cursor. History and the music queue aren't part of it. */
+  const profFind = n => PROFILES.find(x => x.name === n) || null;
+  const profCols = c => { const o = {}; for (const [k] of COLS) o[k] = colWanted(c || {}, k); return o; };
+  function profNow(name) {
+    return { name, active, sort: sortKey, rev: !!sortRev, hidden: !!showHidden,
+      /* the music library view, and the player (shown, and pinned to the side) */
+      mus: mus && !mus.pair ? mus.root : '', bp: playerOn() && !!store.get('bpshow', false), pin: isPinned(),
+      panes: panes.map(p => {
+        const dir = p.mode === 'dir' && !!p.path, cur = dir && p.items[p.cursor];
+        return { path: dir ? p.path : store.get('path' + p.i, p.i ? '/mnt' : '/mnt/user'),
+          gal: !!p.gal, cols: profCols(store.get('cols' + p.i, {})), flt: filterMode() && dir ? p.flt || '' : '',
+          tree: dir && SET.tree ? [...(p.tree || new Map()).keys()].slice(0, 200) : [],
+          sel: dir ? [...p.sel].map(i => p.items[i]).filter(it => it && !it.up).map(it => it.abs || it.n).slice(0, 500) : [],
+          cur: cur && !cur.up ? cur.abs || cur.n : '' };
+      }) };
+  }
+  /* what counts as "changed since it was saved" (the dot): the layout - not the ticks or where the cursor is */
+  const profKey = x => JSON.stringify([x.active ? 1 : 0, x.sort, !!x.rev, !!x.hidden, x.mus || '', !!x.bp, !!x.bp && !!x.pin, x.panes.map(q => [q.path, !!q.gal, COLS.map(([k]) => !!profCols(q.cols)[k]), q.flt || '', [...(q.tree || [])].sort()])]);
+  function profChanged() {
+    const x = profFind(store.get('profile', '')); if (!x || booting || (mus && mus.busy)) return false;
+    try { return profKey(x) !== profKey(profNow(x.name)); } catch (e) { return false; }
+  }
+  const profSub = x => x.panes.map(q => base(q.path) || q.path).join(' ⇄ ');
+  async function profSave(list, done) {
+    let r; try { r = await api('profiles_set', { profiles: JSON.stringify(list) }); } catch (e) { toast(e.message, true); return false; }
+    PROFILES = r.profiles || []; SET.profiles = PROFILES;
+    tabSay({ t: 'prof', list: PROFILES });
+    tabShowName(); winDraw(); if (done) toast(done);
+    return true;
+  }
+  /* a new tab that starts with a profile: its folders now, the rest once it has opened */
+  function profPrime(id, name) {
+    const x = name && profFind(name); if (!x) return;
+    const put = (k, v) => { try { localStorage.setItem(tabKey(k, id), JSON.stringify(v)); } catch (e) {} };
+    x.panes.forEach((q, i) => { put('path' + i, q.path); put('gal' + i, false); put('trail' + i, ''); put('sel' + i, null); put('tree' + i, null); });
+    put('active', x.active ? 1 : 0); put('mus', null); put('profgo', x.name); put('profile', x.name);
+  }
+  async function profGo() {
+    const n = store.get('profgo', ''); if (!n) return;
+    store.set('profgo', ''); await profApply(n, true);
+  }
+  async function profApply(name, quiet) {
+    const x = profFind(name); if (!x) { if (!quiet) toast(`There's no profile called ${name} any more`, true); return; }
+    if (mus) musExit();
+    panes.forEach(q => { if (q.gal) galSet(q, false); });
+    if (cmpOn) endCompare(true);
+    sortKey = x.sort || 'name'; sortRev = !!x.rev; saveSort();
+    showHidden = !!x.hidden; store.set('hidden', showHidden); hid.checked = showHidden;
+    x.panes.forEach((q, i) => store.set('cols' + i, profCols(q.cols)));
+    panes.forEach(p => applyCols(p));
+    await Promise.all(panes.map((p, i) => load(p, x.panes[i].path)));
+    const gone = panes.filter(p => p.error).map(p => x.panes[p.i].path);
+    /* then each pane's open tree folders (a folder that's gone is left out, the others show what they hold now),
+     * the filter, the ticks and the cursor */
+    for (const p of panes) {
+      const q = x.panes[p.i]; if (p.mode !== 'dir' || p.error) continue;
+      const tr = SET.tree && !p.root ? (q.tree || []).filter(t => t.startsWith(p.path === '/' ? '/' : p.path + '/')) : [];
+      p.tree = new Map(); if (tr.length) await treeFetch(p, tr.slice(0, 200));
+      saveTree(p);
+      p.flt = filterMode() ? q.flt || '' : '';
+      await applySort(p);
+      p.sel.clear(); const want = new Set(q.sel || []);
+      if (want.size) p.items.forEach((it, k) => { if (!it.up && want.has(it.abs || it.n)) p.sel.add(k); });
+      const ix = q.cur ? p.items.findIndex(it => (it.abs || it.n) === q.cur) : -1;
+      if (ix >= 0) moveCursor(p, ix, true);
+      drawRows(p); updateSelInfo(p);
+    }
+    saveSel();
+    /* the music library view, when both panes are still in the library */
+    const [L, Rt] = panes;
+    if (x.mus && L.mode === 'dir' && L.path === x.mus && Rt.mode === 'dir' && inDir(Rt.path, x.mus)) {
+      mus = { root: x.mus, busy: false, q: [], i: -1, now: null }; root.classList.add('uc-mus'); store.set('mus', x.mus); store.set('musroot', x.mus);
+      panes.forEach(q => { q.galItems = null; draw(q); }); await musSync();
+    }
+    /* the player: a profile saved with it showing brings it back (one saved without it leaves it as it is) */
+    if (x.bp && playerOn()) { if (isPinned() !== !!x.pin) npPin(!!x.pin); if (!store.get('bpshow', false)) bpShow(true, false); }
+    setActive(x.active ? 1 : 0);
+    if (filterMode()) { jumpBox.value = A().flt || ''; jumpBox.classList.toggle('filtering', !!A().flt); }
+    const g = x.panes.findIndex(q => q.gal); if (!mus && g >= 0 && panes[g].mode === 'dir' && !panes[g].root) galSet(panes[g], true);
+    store.set('profile', x.name); tabTouch(); tabShowName(); winDraw();
+    if (gone.length) toast(`${x.name}: ${gone.join(' and ')} isn't there any more`, true);
+    else if (!quiet) toast(`Loaded ${x.name}`);
+  }
+  function profSaveDlg() {
+    const cur = tabProf();
+    openDlg('Save as a new profile', `<div class="field"><label>Name</label><input type="text" class="pf-in" value="" placeholder="e.g. Movies sorting" spellcheck="false" maxlength="40"><div class="pf-note" hidden></div></div>
+      <div class="muted">Saves what this tab shows now: <b>${esc(profSub(profNow('')))}</b>, the active pane, the sort, hidden files, each pane's columns, list or Gallery, open tree folders, ticks${filterMode() ? ', the filter' : ''}${mus ? ', the music view' : ''}${playerOn() && store.get('bpshow', false) ? ', the player' : ''}. Your profiles are kept on the server, so every browser has them.</div>`,
+      [{ label: 'Cancel' }, { label: 'Save', primary: true, run: () => {
+        const n = $('.pf-in', dlg).value.trim().replace(/\s+/g, ' ');
+        if (!n) { toast('Give the profile a name', true); return false; }
+        const same = PROFILES.find(x => x.name.toLowerCase() === n.toLowerCase());
+        /* the same name as one you have: that one is replaced (in its place in the list) */
+        const list = PROFILES.filter(x => x !== same); list.splice(same ? PROFILES.indexOf(same) : list.length, 0, profNow(n));
+        store.set('profile', n);
+        profSave(list, same ? `Replaced ${same.name}` : `Saved ${n}`).then(ok => { if (!ok) store.set('profile', cur); });
+      } }]);
+    const i = $('.pf-in', dlg), note = $('.pf-note', dlg);
+    i.addEventListener('input', () => { const v = i.value.trim().toLowerCase(), same = v && PROFILES.find(x => x.name.toLowerCase() === v); note.hidden = !same; if (same) note.textContent = `This replaces your profile ${same.name} (${profSub(same)}).`; });
+  }
+  /* profiles renamed in Settings: every tab in this browser showing one keeps showing it */
+  function profRenamed(ren) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i); if (!k || !(k === 'uc.profile' || /^uc\.t\.[^.]+\.profile$/.test(k))) continue;
+        const v = JSON.parse(localStorage.getItem(k) || '""'); if (v && ren[v]) localStorage.setItem(k, JSON.stringify(ren[v]));
+      }
+    } catch (e) {}
+    tabShowName(); winDraw();
+  }
+  function profUpdate() {
+    const n = tabProf(); if (!n) return;
+    profSave(PROFILES.map(x => x.name === n ? profNow(n) : x), `Updated ${n}`);
+  }
+  function profMenu() {
+    const cur = tabProf(), b = (tabEl || $('.uc-tabcombo')).getBoundingClientRect(), changed = !!cur && profChanged();
+    showMenu(b.left, b.bottom + 4, PROFILES.length ? 'Load a profile into this tab' : 'Profiles', [
+      ...(PROFILES.length ? PROFILES.map(x => ({ label: x.name, ic: x.name === cur ? 'check' : 'pane', sub: profSub(x), hl: x.name === cur, run: () => profApply(x.name) }))
+        : [{ label: 'No profiles yet - set the panes up, then save them below', off: true }]),
+      '-',
+      cur ? { label: `Update "${cur}"`, sub: 'with what\'s open now - ticks included', ic: 'refresh', run: profUpdate } : null,
+      { label: 'Save what\'s open now as a new profile…', ic: 'plus', run: profSaveDlg },
+      cur ? { label: 'Stop showing a profile in this tab', ic: 'x', run: () => { store.set('profile', ''); tabTouch(); tabShowName(); winDraw(); } } : null,
+      '-',
+      { label: 'Rename this tab…', ic: 'rename', run: tabRename },
+      { label: 'Manage profiles…', ic: 'edit', run: () => openSettings('prof') },
+    ]);
+  }
+
   /* ---------- the New tab panel ---------- */
   let tabPop = null;
   function tabPanel() {
@@ -21942,28 +23128,29 @@ window.UC_COVER_FONT = [
       tabPop.addEventListener('keydown', e => { if (e.key === 'Escape') { tabPop.hidden = true; root.focus({ preventScroll: true }); } e.stopPropagation(); });
     }
     const show = store.get('tabshow', 'solo'), canWin = !IS_HOMEAPP;
-    tabPop.innerHTML = `<div class="tp-row"><button type="button" class="uc-btn tp-tab">New tab</button>${canWin ? `<a class="uc-btn tp-win" href="/plugins/uncommander/uncommander.php" target="_blank" rel="opener"${IS_FF ? ' title="Firefox opens this as a tab - hold Shift while clicking for a window"' : ''}>New window</a><button type="button" class="uc-btn tp-app">Application window</button>` : ''}</div>
-      ${canWin && IS_FF ? '<div class="tp-tip">Firefox: Shift+click New window for a separate window</div>' : ''}
-      ${canWin ? `<div class="tp-show"><span class="tp-l">Show:</span><label class="chk"><input type="radio" name="tp-show" value="unraid"${show === 'unraid' ? ' checked' : ''}> with unRAID</label><label class="chk"><input type="radio" name="tp-show" value="solo"${show !== 'unraid' ? ' checked' : ''}> unCommander only</label></div>` : ''}
-      <div class="tp-name"><span class="tp-l">Name:</span><input type="text" class="tp-in" value="${esc(store.get('tabname', ''))}" placeholder="tab name…" spellcheck="false" maxlength="40"></div>`;
-    $('.tp-tab', tabPop).addEventListener('click', () => { tabPop.hidden = true; tabOpen('tab'); });      // a browser tab - the + in the tab row adds one there
+    const opt = (name, value, on, label, sub) => `<label class="tp-opt"><input type="radio" name="${name}" value="${esc(value)}"${on ? ' checked' : ''}><span class="tp-ot"><span class="tp-on">${esc(label)}</span>${sub ? `<span class="tp-sub">${esc(sub)}</span>` : ''}</span></label>`;
+    tabPop.innerHTML = `<div class="ctx-h"><span class="dot" aria-hidden="true">🟢</span><span class="t">New tab</span></div><div class="go-sec"><div class="go-h">Open</div>
+        <div class="tp-row"><button type="button" class="uc-btn tp-tab">New tab</button>${canWin ? `<a class="uc-btn tp-win" href="/plugins/uncommander/uncommander.php" target="_blank" rel="opener"${IS_FF ? ' title="Firefox opens this as a tab - hold Shift while clicking for a window"' : ''}>New window</a><button type="button" class="uc-btn tp-app">Application window</button>` : ''}</div>
+        ${canWin && IS_FF ? '<div class="tp-tip">Firefox: Shift+click New window for a separate window</div>' : ''}</div>
+      ${canWin ? `<div class="go-sec"><div class="go-h">Show</div><div class="tp-opts">${opt('tp-show', 'unraid', show === 'unraid', "With unRAID's menu")}${opt('tp-show', 'solo', show !== 'unraid', 'unCommander only')}</div></div>` : ''}
+      ${PROFILES.length ? `<div class="go-sec"><div class="go-h">Start with</div><div class="tp-opts tp-start">${opt('tp-start', '', true, 'The folders open now')}${PROFILES.map(x => opt('tp-start', x.name, false, x.name, profSub(x))).join('')}</div></div>` : ''}`;
+    const startWith = () => { const r = $('input[name=tp-start]:checked', tabPop); return r ? r.value : ''; };
+    $('.tp-tab', tabPop).addEventListener('click', () => { tabPop.hidden = true; tabOpen('tab', tabPrep('tab', startWith())); });      // a browser tab - the + in the tab row adds one there
     if (canWin) {
       /* Chrome and Edge open a normal window when asked for one; Firefox puts it in a tab unless
        * the link is Shift+clicked - so this is a real link, with its new tab ready before the click */
       const tw = $('.tp-win', tabPop); let prep = null;
-      const ready = () => { if (!prep) { prep = tabPrep('win'); tw.href = prep.url; } };
+      const ready = () => { if (!prep) { prep = tabPrep('win', startWith()); tw.href = prep.url; } };
+      tabPop.addEventListener('change', e => { if (e.target.name === 'tp-start' && prep) { tabForget(prep.id); prep = null; tw.href = '/plugins/uncommander/uncommander.php'; } });
       tw.addEventListener('pointerdown', ready); tw.addEventListener('focus', ready);
       tw.addEventListener('click', e => {
         ready(); tabPop.hidden = true;
         if (e.shiftKey) return;                       // the browser's own "open in a new window"
         e.preventDefault(); tabOpen('win', prep); prep = null;
       });
-      $('.tp-app', tabPop).addEventListener('click', () => { tabPop.hidden = true; tabOpen('app'); });
+      $('.tp-app', tabPop).addEventListener('click', () => { tabPop.hidden = true; tabOpen('app', tabPrep('app', startWith())); });
     }
     $$('input[name=tp-show]', tabPop).forEach(r => r.addEventListener('change', () => store.set('tabshow', r.value)));
-    const inp = $('.tp-in', tabPop);
-    inp.addEventListener('input', () => { store.set('tabname', inp.value.trim()); tabShowName(); winDraw(); });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { tabPop.hidden = true; tabTouch(); root.focus({ preventScroll: true }); } });
     const b = $('.uc-tabcombo').getBoundingClientRect();
     tabPop.hidden = false;
     tabPop.style.left = '0px'; tabPop.style.top = '0px';
@@ -21973,7 +23160,7 @@ window.UC_COVER_FONT = [
     sound.play('click');
   }
   if (tabBtn) tabBtn.addEventListener('click', tabPanel);
-  if (tabEl) tabEl.addEventListener('click', () => { tabPanel(); const i = tabPop && $('.tp-in', tabPop); if (i && !tabPop.hidden) { i.focus(); i.select(); } });
+  if (tabEl) tabEl.addEventListener('click', e => { e.stopPropagation(); if (tabPop) tabPop.hidden = true; profMenu(); });
   tabShowName();
 
   /* ---------- the array stopped: what still works, and back to normal when it starts ---------- */
@@ -22057,6 +23244,7 @@ window.UC_COVER_FONT = [
     } else if (mr) store.set('mus', null);
     const g = panes.find(p => store.get('gal' + p.i, false) && p.mode === 'dir' && !p.root);
     if (g) galSet(g, true);
+    profGo();                  // a new tab that was asked to start with a profile
   });
   pollJobs('init');
   /* unRAID draws its own title bar (icon + page name) above every page.

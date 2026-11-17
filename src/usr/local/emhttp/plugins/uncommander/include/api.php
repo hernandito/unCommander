@@ -6,6 +6,21 @@ require_once __DIR__ . '/lib.php';
  * disk that's spinning up) would otherwise make every other request wait. */
 if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
+/* A RAW photo's preview, for the viewer and Save as JPG: the camera's own JPG from inside it */
+if (($_GET['action'] ?? '') === 'rawprev') {
+  try { $p = uc_arc_real(uc_path((string)($_GET['path'] ?? ''))); } catch (Throwable $e) { http_response_code(403); exit; }
+  if (!in_array(strtolower(pathinfo($p, PATHINFO_EXTENSION)), UC_RAW_EXT, true) || !is_file($p) || !is_readable($p)) { http_response_code(404); exit; }
+  ini_set('memory_limit', '512M');
+  $d = uc_raw_jpeg($p);
+  if ($d === null) { http_response_code(415); exit; }
+  header('Content-Type: image/jpeg');
+  header('Content-Length: ' . strlen($d));
+  header('Content-Disposition: inline; filename="' . str_replace(['"', "\r", "\n"], '', pathinfo($p, PATHINFO_FILENAME)) . '.jpg"');
+  header('X-Content-Type-Options: nosniff');
+  header('Cache-Control: private, max-age=600');
+  while (ob_get_level()) ob_end_clean();
+  echo $d; exit;
+}
 /* Raw file for the image/PDF viewer: a GET (read-only), limited to image
  * and PDF types so nothing that could run as a web page is ever served. */
 if (($_GET['action'] ?? '') === 'raw') {
@@ -359,6 +374,8 @@ if (($_GET['action'] ?? '') === 'thumb') {
   $ext = strtolower(pathinfo($p, PATHINFO_EXTENSION));
   $make = ['jpg' => 'imagecreatefromjpeg', 'jpeg' => 'imagecreatefromjpeg', 'png' => 'imagecreatefrompng', 'gif' => 'imagecreatefromgif',
            'webp' => 'imagecreatefromwebp', 'bmp' => 'imagecreatefrombmp', 'avif' => 'imagecreatefromavif'][$ext] ?? null;
+  $isRaw = in_array($ext, UC_RAW_EXT, true);
+  if ($isRaw) $make = 'imagecreatefromstring';
   if (!$make || !function_exists($make) || !is_file($p) || !is_readable($p)) { http_response_code(404); exit; }
   $s = max(64, min(640, (int)($_GET['s'] ?? 320)));
   $st = stat($p);
@@ -366,13 +383,16 @@ if (($_GET['action'] ?? '') === 'thumb') {
   $f = "$dir/" . sha1("$p|{$st['mtime']}|{$st['size']}|$s") . '.jpg';
   if (!is_file($f)) {
     @mkdir($dir, 0700, true);
-    $info = @getimagesize($p);
-    if (!$info || $info[0] * $info[1] > 80000000) { http_response_code(404); exit; }      // unreadable, or too huge to open in memory
     ini_set('memory_limit', '1536M');
-    $im = @$make($p);
+    $jd = null;
+    if ($isRaw) {                                             // a RAW photo: its camera preview
+      $jd = uc_raw_jpeg($p); $info = $jd !== null ? @getimagesizefromstring($jd) : null;
+    } else $info = @getimagesize($p);
+    if (!$info || $info[0] * $info[1] > 80000000) { http_response_code(404); exit; }      // unreadable, or too huge to open in memory
+    $im = $isRaw ? @imagecreatefromstring($jd) : @$make($p);
     if (!$im) { http_response_code(404); exit; }
-    if ($ext === 'jpg' || $ext === 'jpeg') {                 // turn it the way the camera said
-      $o = uc_jpeg_orientation($p);
+    if ($ext === 'jpg' || $ext === 'jpeg' || $isRaw) {       // turn it the way the camera said
+      $o = $isRaw ? uc_jpeg_orientation_data(substr($jd, 0, 131072)) : uc_jpeg_orientation($p); $jd = null;
       if (in_array($o, [2, 4, 5, 7], true)) imageflip($im, $o === 4 ? IMG_FLIP_VERTICAL : IMG_FLIP_HORIZONTAL);
       $deg = [3 => 180, 5 => 90, 6 => 270, 7 => 270, 8 => 90][$o] ?? 0;      // imagerotate turns anticlockwise
       if ($deg) { $r = imagerotate($im, $deg, 0); if ($r) { imagedestroy($im); $im = $r; } }
@@ -679,7 +699,7 @@ try {
           'g' => uc_group($s['gid']),
           'd' => $isDir,
           'l' => $isLink ? @readlink($p) : null,
-        ];
+        ] + (!$isDir && !$isLink && $s['nlink'] > 1 ? ['n' => $s['nlink']] : []);
       }
       uc_json(['stats' => $out]);
     }
@@ -1258,6 +1278,7 @@ try {
       $ff = uc_ffmpeg();
       if (!$ff) { uc_ff_start(); throw new UcError('Getting ffmpeg first (58 MB, once) - try again in a minute'); }
       $mode = arg('mode');
+      if ($mode === 'vaapi' && !uc_vaapi_libs()) uc_json(['ok' => false, 'secs' => 0, 'error' => UC_NO_VAAPI]);
       $src = '-f lavfi -i testsrc2=size=1280x720:rate=25 -t 2';
       $cmd = ['cpu' => "$src -vf format=yuv420p -c:v libx264 -preset veryfast",
               'nvidia' => "-init_hw_device cuda=gpu -filter_hw_device gpu $src -vf format=yuv420p,hwupload -c:v h264_nvenc",
@@ -2187,6 +2208,36 @@ try {
       uc_json(['ok' => true, 'settings' => uc_settings()]);
     }
 
+    /* Profiles saved or updated from the tab's name box: only the list of profiles changes */
+    case 'profiles_set': {
+      $list = json_decode((string)arg('profiles', '[]'), true);
+      $f = dirname(UC_CFG) . '/settings.json';
+      @mkdir(dirname(UC_CFG), 0777, true);
+      $lk = fopen("$f.lock", 'c'); flock($lk, LOCK_EX);
+      $s = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+      $s['profiles'] = uc_profiles_clean($list);
+      file_put_contents("$f.tmp", json_encode($s, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); rename("$f.tmp", $f);
+      flock($lk, LOCK_UN); fclose($lk);
+      uc_json(['ok' => true, 'profiles' => $s['profiles']]);
+    }
+    /* a photo's details (EXIF) for the viewer and the Gallery preview */
+    case 'photo_meta': {
+      $p = uc_arc_real(uc_path((string)arg('path')));
+      if (!is_file($p) || !is_readable($p)) throw new UcError("Can't read this file");
+      uc_json(['ok' => true] + (uc_photo_meta($p) ?: ['sections' => [], 'gps' => null]));
+    }
+    /* Batch rename's saved rules: only this key is rewritten, so nothing else in settings.json changes */
+    case 'brrules_set': {
+      $list = json_decode((string)arg('rules', '[]'), true);
+      $f = dirname(UC_CFG) . '/settings.json';
+      @mkdir(dirname(UC_CFG), 0777, true);
+      $lk = fopen("$f.lock", 'c'); flock($lk, LOCK_EX);
+      $s = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+      $s['brrules'] = uc_brrules_clean($list);
+      file_put_contents("$f.tmp", json_encode($s, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); rename("$f.tmp", $f);
+      flock($lk, LOCK_UN); fclose($lk);
+      uc_json(['ok' => true, 'rules' => $s['brrules']]);
+    }
     case 'save_settings': {
       $in = arg('settings');
       if (is_string($in)) $in = json_decode($in, true);
@@ -2213,6 +2264,9 @@ try {
         'tree' => !empty($in['tree']),
         'vplay' => !empty($in['vplay']),
         'menu_show' => !empty($in['menu_show']),
+        'menu_newtab' => in_array($in['menu_newtab'] ?? '', ['solo', 'unraid'], true) ? $in['menu_newtab'] : '',
+        'profiles' => uc_profiles_clean(array_key_exists('profiles', $in) ? $in['profiles'] : uc_settings()['profiles']),
+        'brrules' => uc_brrules_clean(array_key_exists('brrules', $in) ? $in['brrules'] : uc_settings()['brrules']),
         'palette' => uc_palette_clean($in['palette'] ?? null),
         'mythemes' => array_values(array_filter(array_map(fn($t) => is_array($t) && trim((string)($t['name'] ?? '')) !== '' ? ['name' => mb_substr(trim((string)$t['name']), 0, 40)] + uc_palette_clean($t) : null, is_array($in['mythemes'] ?? null) ? array_slice($in['mythemes'], 0, 30) : []))),
         'vsmooth' => !empty($in['vsmooth']),
@@ -2441,6 +2495,55 @@ try {
       exec('setsid nohup ' . escapeshellarg($php) . ' -d memory_limit=1024M ' . escapeshellarg(__DIR__ . '/worker.php')
            . ' ' . escapeshellarg($job['id']) . ' >/dev/null 2>&1 &');
       uc_json(['ok' => true, 'job' => $job['id'], 'moved' => $job['moved'] ?? [], 'hist' => $job['hist'] ?? null]);
+    }
+
+    /* Links in the other pane: hard links (the same file in two places, no extra space - only within one
+     * disk or pool) or symbolic links (a pointer, can go anywhere). Folders: a hard-linked copy of the
+     * folder (every file inside linked, like cp -al) or one symbolic link to the folder. Never replaces
+     * anything: a name that's already there is skipped. Undo moves the new links to the trash - the
+     * originals stay as they are. */
+    case 'link': {
+      uc_practice_block('making links');
+      $kind = arg('kind', 'hard') === 'sym' ? 'sym' : 'hard';
+      $sources = array_map('uc_path', arg_list('sources'));
+      $dest = uc_path(arg('dest'));
+      if (!$sources) throw new UcError('Nothing selected');
+      if (!is_dir($dest)) throw new UcError("The other pane isn't a folder");
+      foreach ($sources as $s) {
+        if (uc_arc_split($s) && !file_exists($s)) throw new UcError("Things inside an archive can't be linked - copy them out first");
+        if (!file_exists($s) && !is_link($s)) throw new UcError(basename($s) . ' is no longer there');
+        if (dirname($s) === $dest) throw new UcError('That is the same folder - pick a different one in the other pane');
+        if ($dest === $s || str_starts_with($dest . '/', $s . '/')) throw new UcError("Can't put a link to " . basename($s) . ' inside itself');
+      }
+      /* a hard link can't leave its disk: say so before anything is made */
+      $top = function (string $p): string { return preg_match('#^/mnt/([^/]+)#', $p, $m) ? $m[1] : '/'; };
+      if ($kind === 'hard') {
+        $ds = @stat($dest);
+        foreach ($sources as $s) {
+          $ss = @lstat($s);
+          if ($ss && $ds && $ss['dev'] !== $ds['dev']) {
+            $a = $top($s); $b = $top($dest);
+            if (($a === 'user') !== ($b === 'user')) throw new UcError("A hard link can't join /mnt/user with a single disk or pool - open both sides the same way (both in /mnt/user, or both on the disk)");
+            throw new UcError('A hard link has to stay on one disk or pool: ' . basename($s) . " is on $a, the other pane is on $b. Copy it instead, or make a symbolic link");
+          }
+        }
+      }
+      $made = []; $skipped = []; $failed = [];
+      foreach ($sources as $s) {
+        $t = uc_join($dest, basename($s));
+        if (file_exists($t) || is_link($t)) { $skipped[] = basename($s); continue; }
+        if ($kind === 'sym') { if (@symlink($s, $t)) $made[] = $t; else $failed[] = basename($s) . ': ' . (error_get_last()['message'] ?? 'not allowed'); continue; }
+        $out = [];
+        exec('cp -a -l -- ' . escapeshellarg($s) . ' ' . escapeshellarg($t) . ' 2>&1', $out, $rc);
+        if (file_exists($t) || is_link($t)) $made[] = $t;          // even half-made, so Undo can take it away
+        if ($rc !== 0) {
+          $msg = trim((string)end($out));
+          $failed[] = basename($s) . ': ' . (preg_match('/cross-device/i', $msg) ? "it's on a different disk or pool than the other pane (in /mnt/user, both have to be on the same disk)" : preg_replace('/^cp: /', '', $msg));
+        }
+      }
+      $what = count($made) === 1 ? basename($made[0]) : count($made) . ' items';
+      $hid = $made ? uc_hist_add(($kind === 'hard' ? 'Hard-linked ' : 'Made symbolic links to ') . "$what in $dest", array_map(fn($t) => ['t' => 'made', 'p' => $t], $made)) : null;
+      uc_json(['ok' => true, 'made' => array_map('basename', $made), 'skipped' => $skipped, 'failed' => $failed, 'hist' => $hid]);
     }
 
     /* ---------- Tools: background scans (read-only) ---------- */

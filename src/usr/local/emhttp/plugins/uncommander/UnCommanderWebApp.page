@@ -16,3 +16,27 @@ Link="uc-webapp-hook"
   } catch (e) {}
 })();
 </script>
+<?php
+/* Settings > General > "Open in a new tab": unCommander's entry in unRAID's top menu opens it in its own
+ * browser tab (the same tab again on later clicks). Read straight from the settings file - this runs on every page. */
+$ucS = @json_decode((string)@file_get_contents('/boot/config/plugins/uncommander/settings.json'), true);
+$ucNew = ($ucS['menu_newtab'] ?? '') === true ? 'solo' : ($ucS['menu_newtab'] ?? '');
+if ($ucNew === 'solo' || $ucNew === 'unraid'): ?>
+<script>
+(function () {
+  var URL = <?=$ucNew === 'unraid' ? "'/UnCommander'" : "'/plugins/uncommander/uncommander.php'"?>, NAME = 'uncommander';
+  if (window.name === NAME) return;                      // this is unCommander's own tab: its menu entry opens it here
+  function ours(a) { var h = a && a.getAttribute('href'); return h && /^(https?:\/\/[^/]+)?\/UnCommander\/?$/.test(h) && !a.closest('#uc, .ucu'); }
+  document.addEventListener('click', function (e) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest('a'); if (!ours(a)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    var w = null;
+    try { w = window.open('', NAME); } catch (er) {}
+    if (!w) { location.href = a.getAttribute('href'); return; }            // pop-ups blocked: open it here as before
+    try { if (w.location.href === 'about:blank' || (w.location.pathname.indexOf('/plugins/uncommander/') !== 0 && !/^\/UnCommander\/?$/.test(w.location.pathname))) w.location.href = URL; } catch (er) { w.location.href = URL; }
+    try { w.focus(); } catch (er) {}
+  }, true);
+})();
+</script>
+<?php endif; ?>

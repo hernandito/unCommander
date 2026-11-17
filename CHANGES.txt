@@ -1,3 +1,21 @@
+###2026.11.14
+- Profiles: save what both panes show (folders, active pane, sort, hidden files, columns, list or Gallery, open tree folders, ticks, filter, the music view and the player) under a name, and load it again from the box next to the New tab button. A dot shows when the tab has changed since. New tab, New window and the tab row's + (right-click) can start with a profile. Settings > Profiles renames, reorders and removes them. Kept on the server, so every browser has them
+- The box next to the New tab button is now the profile menu (Rename this tab is in it); the Name box in the New tab panel is gone
+- Gallery view: drag the line between the panes to make the preview bigger (back to half and half outside Gallery; double-click the line for half and half). The cards keep their S/M/L size and wrap; a narrow gallery pane becomes the normal file list with your columns (dropping columns before a name is cut), while the preview stays. The gallery side keeps its width when the browser is resized. Gallery stays on in the folder you turned it on in and the folders inside it; going anywhere else goes back to the normal list. The picked card has a full accent border
+- Gallery: turning it on starts on the first picture; a folder shows a fan of the pictures inside it (poster/folder/cover first)
+- Gallery preview and picture viewer: ‹ › over the picture go through the folder's pictures; a Details tick box shows or hides the photo details; the photo details go under the picture or beside it, whichever leaves the picture bigger
+- Photo details: the picture viewer fills the window with the camera details (camera, lens, exposure, date, size, GPS with a Google Maps link) in a column on the right; the Gallery preview shows them under the picture
+- RAW photos (Fuji RAF, Nikon NEF, Canon CR2/CR3, Sony ARW, DNG, Olympus, Panasonic, Pentax, Samsung) show in the viewer and Gallery from the camera's preview inside them; right-click > Save as JPG. RAW files are never changed
+- Batch rename: a Regex cheat sheet with ready-made patterns to click, tidier option boxes
+- Batch rename: finds accented letters however the file name spells them (files from a Mac often store é as e plus an accent mark), and the filter does too
+- Batch rename: save a rule under a name (Save these settings as…) and pick it again from the Saved list - kept on the server, so every browser has them. Find, Replace with, Text to add and New name remember what you renamed with recently (the ▾ in each box)
+- Link in the other pane (right-click menu): hard links - files or whole folders, checked to stay on one disk or pool - or symbolic links. Undo removes them
+- Files with more than one hard link show a link badge with the count; symbolic links show a "link" badge
+- New colour themes: Mist (soft grey, a little steel blue) and unRAID orange with a grey frame. Norton is softer and more modern (pick it again to get the new colours). Themes can give the active pane's frame its own colour (Active pane frame, in Colours)
+- Settings > General: unCommander's entry in unRAID's top menu can open it in a new browser tab - with or without unRAID's menu
+- Settings > About links to the User Guide; the playlist folders box says "Enter path here…"
+- Intel/AMD graphics: when unRAID lacks the VA-API drivers they need, Settings says so and videos use the CPU - no more ffmpeg crash message
+
 ###2026.11.09a
 The biggest update since the first release (full guide in the README on GitHub):
 - Undo History: every change recorded, undo any step or part of one, days later

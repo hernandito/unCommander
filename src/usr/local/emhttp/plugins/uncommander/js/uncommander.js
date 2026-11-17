@@ -188,6 +188,8 @@
   let booting = true;          // true until both panes have loaded once
   const UP_ICON = '<svg class="up" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5 3 7.5h3.3V13.5h3.4V7.5H13z"/></svg>';
   let SET = window.UC_SETTINGS || { bookmarks: [], css: '', sounds: {}, trash_days: 7 };
+  /* profiles: named layouts (both panes' folders, views, sort...) kept on the server, so every browser has them */
+  let PROFILES = Array.isArray(SET.profiles) ? SET.profiles : [];
   const $ = (s, el = root) => el.querySelector(s);
   const $$ = (s, el = root) => Array.from(el.querySelectorAll(s));
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -215,7 +217,7 @@
     if (!okId(v) && (WIN_Q || WIN_T)) { const w = JSON.parse(localStorage.getItem('uc.win.' + (WIN_Q || WIN_T)) || 'null'); if (w && okId(w.cur)) v = w.cur; }
     if (okId(v)) TAB = v;
   } catch (e) {}
-  const TAB_KEY = /^(?:(?:path|trail|hist|fwd|sel|tree|gal)[01]|active|mus|tabname)$/;
+  const TAB_KEY = /^(?:(?:path|trail|hist|fwd|sel|tree|gal)[01]|active|mus|tabname|profile|profgo)$/;
   const tabKey = (k, id = TAB) => id !== 'main' && TAB_KEY.test(k) ? `uc.t.${id}.${k}` : 'uc.' + k;
   const store = {
     get(k, d) { try { const v = localStorage.getItem(tabKey(k)); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -330,7 +332,7 @@
     const c = store.get('cols' + p.i, {});
     let tmpl = '36px minmax(0,1fr)';
     for (const [k, , w] of COLS) {
-      const on = colWanted(c, k) && (k !== 'disk' || userView(p));
+      const on = colWanted(c, k) && (k !== 'disk' || userView(p)) && !(p.colCut && p.colCut.has(k));   // colCut: squeezed out by a narrow Gallery list
       p.el.classList.toggle('hide-' + k, !on); if (on) tmpl += ` calc(${w} * var(--fs, 1))`;   // widths grow with the text size
     }
     p.el.style.setProperty('--cols', tmpl);
@@ -379,7 +381,7 @@
     $('.uc-arcclose', p.el).addEventListener('click', e => { e.stopPropagation(); if (p.arc) load(p, parent(p.arc.file), base(p.arc.file)); });
     $('.uc-galbtn', p.el).addEventListener('click', e => { e.stopPropagation(); setActive(p.i); galSet(p, !p.gal); });
     $('.uc-galsz', p.el).addEventListener('click', e => { const b = e.target.closest('[data-gs]'); if (!b) return; e.stopPropagation();
-      store.set('galSize', b.dataset.gs); p.el.style.setProperty('--tile', galSize()[0] + 'px'); p.galItems = null; drawRows(p); galScroll(p); });
+      store.set('galSize', b.dataset.gs); p.el.style.setProperty('--tile', galSize()[0] + 'px'); galFit(p); p.galItems = null; drawRows(p); galScroll(p); });
     $('.uc-cancel', p.el).addEventListener('click', () => cancelLoad(p));
     $('.uc-musbtn', p.el).addEventListener('click', e => { e.stopPropagation(); setActive(p.i); mus ? musExit() : musEnter(p); });
     $('.uc-endmus', p.el).addEventListener('click', e => { e.stopPropagation(); musExit(); });
@@ -387,7 +389,7 @@
     p.hist = store.get('hist' + p.i, []); p.fwd = store.get('fwd' + p.i, []);
     $('.uc-back', p.el).addEventListener('click', e => { e.stopPropagation(); goBack(p); });
     $('.uc-fwd', p.el).addEventListener('click', e => { e.stopPropagation(); goForward(p); });
-    p.list.addEventListener('scroll', () => { if (p.gal || p.mt) return; drawRows(p); queueStat(p); }, { passive: true });
+    p.list.addEventListener('scroll', () => { if (tilesOn(p)) return; drawRows(p); queueStat(p); }, { passive: true });
     /* Clicking a row of the other pane makes it active. Done after the click:
      * redrawing the rows on mousedown would swallow the click itself, so the
      * first click only switched panes instead of also picking the row. */
@@ -690,8 +692,8 @@
   }
 
   function filtered(p) {
-    const f = p.flt && p.mode === 'dir' && !p.root ? p.flt.toLowerCase() : '';
-    return p.all.filter(it => (showHidden || p.mode !== 'dir' || !it.n.startsWith('.')) && (!f || base(it.n).toLowerCase().includes(f)));
+    const f = p.flt && p.mode === 'dir' && !p.root ? p.flt.normalize('NFC').toLowerCase() : '';   // NFC: é typed matches é spelled e + accent mark
+    return p.all.filter(it => (showHidden || p.mode !== 'dir' || !it.n.startsWith('.')) && (!f || base(it.n).normalize('NFC').toLowerCase().includes(f)));
   }
 
   async function applySort(p, fresh) {
@@ -828,11 +830,15 @@
     return [Math.max(0, Math.floor(top / ROW) - 5), Math.min(p.items.length, Math.ceil((top + h) / ROW) + 5)];
   }
   function draw(p) {
-    if (p.gal && (p.mode !== 'dir' || p.root)) galSet(p, false);
+    /* Gallery stays on in the folder it was turned on in and the folders inside it; going anywhere else
+     * (up past it, Back, a shortcut, Go to…) goes back to the normal list */
+    const galHome = p.galRoot && p.path && (p.path === p.galRoot || p.path.startsWith(p.galRoot.replace(/\/$/, '') + '/'));
+    if (p.gal && (p.mode !== 'dir' || p.root || (p.galRoot && !galHome))) galSet(p, false);
     const mt = musTiles(p);
     if (mt !== !!p.mt) { p.mt = mt; p.galItems = null; p.el.classList.toggle('mus-tiles', mt); if (!p.gal) p.el.classList.toggle('gal', mt); if (mt) p.el.style.setProperty('--tile', galSize()[0] + 'px'); }
-    p.spacer.style.height = p.gal || p.mt ? '' : (p.items.length * ROW) + 'px';
+    p.spacer.style.height = tilesOn(p) ? '' : (p.items.length * ROW) + 'px';
     musBtn(p); musStrip(p); musFacts(p); udStrip(p);
+    if (p.gal && root.classList.contains('uc-galsplit')) galFit(p);   // a new folder: its names decide which list columns fit
     const gb = $('.uc-galbtn', p.el);
     if (gb) { gb.hidden = (!p.gal && !galFits(p)) || !!mus; gb.classList.toggle('on', !!p.gal); gb.title = p.gal ? 'Back to the list' : 'Gallery view - pictures as tiles; the other pane shows the one you pick'; $('.uc-galsz', p.el).hidden = !p.gal && !p.mt; }
     const n = p.items.filter(it => !it.up).length;
@@ -855,8 +861,11 @@
     const when = m ? `${+m[2]}/${m[3]} ${m[4]}:${m[5]}` : '';
     return `<span class="bin-name">${esc(base(o))}</span><span class="bin-meta">${when ? 'deleted ' + when + ' · ' : ''}from ${esc(parent(o))}</span>`;
   }
+  /* a pane shows tiles in Gallery (unless it's narrowed to a list) and in the music library */
+  const tilesOn = p => (p.gal && !p.galList) || p.mt;
   function drawRows(p) {
-    if (p.gal || p.mt) return drawGal(p);
+    if (tilesOn(p)) return drawGal(p);
+    if (p.gal && (p.cursor !== p.galLast || p.prevPath !== p.path)) { p.galLast = p.cursor; p.prevPath = p.path; clearTimeout(p.galT); p.galT = setTimeout(() => galPreview(p), 90); }   // a Gallery narrowed to a list still feeds the preview
     const [a, b] = visibleRange(p);
     const fine = finePointer() && !p.root, tree = treeOn(p);
     const rm = recentMins(), recentCut = rm && !p.root ? (Date.now() + srvSkew - rm * 60000) / 1000 : 0;
@@ -877,7 +886,7 @@
       const dur = p.durs && !it.up && !it.depth ? p.durs.get(it.n) : null;
       html += `<div class="${cls}" data-idx="${i}" style="top:${i * ROW}px"${!it.up && fine ? ' draggable="true"' : ''}>
         <div class="col-sel">${it.up ? '' : `<span class="box${sel ? ' on' : ''}"></span>`}</div>
-        <div class="nm col-name${isDir ? ' dir' : ''}${it.t === 'l' ? ' link' : ''}${it.up ? ' up' : ''}" title="${esc(it.n)}${s && s.l ? ' → ' + esc(s.l) : ''}">${it.up ? UP_ICON : ''}${tree && !it.up ? `<span class="tcar${isDir ? '' : ' none'}${isDir && p.tree.has(fullPath(p, it)) ? ' on' : ''}" style="margin-left:${(it.depth || 0) * 16}px"${isDir ? ' title="Show what\'s inside here"' : ''}>${isDir ? mi('chev') : ''}</span>` : ''}${it.exit ? 'Back to ' + esc(p.findInfo.start) : binLabel(p, it) || (cm ? `<span class="nm-t ${cm}">${esc(it.n)}</span>` : esc(it.n))}${cs && CMP_TAG[cs] ? `<span class="cmp-tag ${cs}">${CMP_TAG[cs]}</span>` : ''}${cm ? `<span class="clip-tag ${cm}">${cm === 'cut' ? '✂ cut' : cm === 'del' ? '🗑 to delete' : '⧉ copy'}</span>` : ''}${dur ? `<span class="mus-len">${fmtT(dur)}</span>` : ''}${p.ud && p.udMap ? udCell(p, it) : ''}</div>
+        <div class="nm col-name${isDir ? ' dir' : ''}${it.t === 'l' ? ' link' : ''}${it.up ? ' up' : ''}" title="${esc(it.n)}${s && s.l ? ' → ' + esc(s.l) : ''}">${it.up ? UP_ICON : ''}${tree && !it.up ? `<span class="tcar${isDir ? '' : ' none'}${isDir && p.tree.has(fullPath(p, it)) ? ' on' : ''}" style="margin-left:${(it.depth || 0) * 16}px"${isDir ? ' title="Show what\'s inside here"' : ''}>${isDir ? mi('chev') : ''}</span>` : ''}${it.exit ? 'Back to ' + esc(p.findInfo.start) : binLabel(p, it) || (cm ? `<span class="nm-t ${cm}">${esc(it.n)}</span>` : esc(it.n))}${cs && CMP_TAG[cs] ? `<span class="cmp-tag ${cs}">${CMP_TAG[cs]}</span>` : ''}${cm ? `<span class="clip-tag ${cm}">${cm === 'cut' ? '✂ cut' : cm === 'del' ? '🗑 to delete' : '⧉ copy'}</span>` : ''}${dur ? `<span class="mus-len">${fmtT(dur)}</span>` : ''}${s && s.n > 1 && !it.up ? `<span class="nl-tag" title="Hard-linked: this file is in ${s.n} places, and takes its space only once">${LINK_IC}${s.n}</span>` : ''}${it.t === 'l' && !it.up ? `<span class="nl-tag sym" title="Symbolic link${s && s.l ? ' → ' + esc(s.l) : ''}">${SYM_IC}link</span>` : ''}${p.ud && p.udMap ? udCell(p, it) : ''}</div>
         <div class="num col-size${isDir && dirSize(p, it) != null ? ' dsz' : ''}${!isDir && s && s.s >= 1e9 ? ' gb' : ''}">${it.up ? '—' : isDir && dirSize(p, it) != null ? fmtSize(dirSize(p, it)) : s ? (isDir ? '—' : fmtSize(s.s)) : ''}</div>
         <div class="col-disk">${it.up ? '' : diskCell(p, it)}</div>
         <div class="perm col-date" title="${s && s.m ? new Date(s.m * 1000).toLocaleString() : ''}">${it.up ? '—' : s ? fmtDate(s.m) : ''}</div>
@@ -1010,7 +1019,7 @@
     p.armed = null;
     p.cursor = Math.max(0, Math.min(p.items.length - 1, i));
     musFollow(p);
-    if (p.gal || p.mt) { drawRows(p); galScroll(p); return; }
+    if (tilesOn(p)) { drawRows(p); galScroll(p); return; }
     const top = p.cursor * ROW, h = p.list.clientHeight;
     if (center) p.list.scrollTop = Math.max(0, top - h / 2);
     else if (top < p.list.scrollTop) p.list.scrollTop = top;
@@ -1063,7 +1072,11 @@
 
   /* ---------- the menu itself (a bottom sheet on touch screens) ---------- */
   /* line icons, drawn like the rest of unCommander's */
+  /* row markers: hard links (with the count) and symbolic links - bold enough to spot at a glance */
+  const LINK_IC = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.6 9.4l2.8-2.8"/><path d="M7.2 4.7l1.3-1.3a2.6 2.6 0 0 1 3.7 3.7l-1.3 1.3"/><path d="M8.8 11.3l-1.3 1.3a2.6 2.6 0 0 1-3.7-3.7l1.3-1.3"/></svg>';
+  const SYM_IC = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13V9a3 3 0 0 1 3-3h7"/><path d="M10 3l3 3-3 3"/></svg>';
   const MI = {
+    chain: '<path d="M6.6 9.4l2.8-2.8"/><path d="M7.3 4.6l1.2-1.2a2.6 2.6 0 0 1 3.7 3.7L11 8.3"/><path d="M8.7 11.4l-1.2 1.2a2.6 2.6 0 0 1-3.7-3.7L5 7.7"/>',
     view: '<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>',
     edit: '<path d="M10.5 2.5l3 3-8 8h-3v-3z"/><path d="M9 4l3 3"/>',
     open: '<path d="M1.5 4v8.5h13V5.5H8L6.5 4z"/>',
@@ -1644,6 +1657,8 @@
       items.push(allTagged ? { label: 'Untag', ic: 'trash', sub: 'take it off the delete list', run: () => clipUntag(p, idx) }
         : { label: 'Tag for delete', ic: 'trash', danger: true, sub: 'add to the delete list - nothing is deleted yet', lock: lockIf('deleting'), run: () => clipTake(p, idx, 'del') });
     }
+    const raws = its.filter(t => !itDir(p, t) && RAWX.test(t.n));
+    if (raws.length) items.push({ label: raws.length === 1 ? 'Save as JPG' : `Save ${raws.length} RAW photos as JPG`, ic: 'copy', sub: "the camera's preview, as a .jpg next to each - the RAW stays", run: () => heicToJpg(raws.map(t => fullPath(p, t))) });
     const heics = its.filter(t => !itDir(p, t) && HEIC.test(t.n));
     if (heics.length) items.push({ label: heics.length === 1 ? 'Convert to JPG' : `Convert ${heics.length} HEIC to JPG`, ic: 'copy', sub: 'a .jpg next to each - the HEIC stays', run: () => heicToJpg(heics.map(t => fullPath(p, t))) });
     const nT = ticked().length;
@@ -1673,7 +1688,8 @@
     if (inDir && q.mode === 'dir' && !q.root) {
       const into = `into ${base(q.path) || q.path} (${q.i ? 'right' : 'left'} pane)`;
       items.push('-', { label: 'Copy to the other pane', ic: 'copy', sc: fkKeyOf('copy'), sub: into, run: () => actOn(p, idx, 'copy') },
-                      { label: 'Move to the other pane', ic: 'pane', sc: fkKeyOf('move'), sub: into, lock: lockIf('moving'), run: () => actOn(p, idx, 'move') });
+                      { label: 'Move to the other pane', ic: 'pane', sc: fkKeyOf('move'), sub: into, lock: lockIf('moving'), run: () => actOn(p, idx, 'move') },
+                      { label: 'Link in the other pane…', ic: 'chain', sub: 'a hard or symbolic link - no extra space', lock: lockIf('making links'), run: () => linkDlg(p, its, q) });
     }
     items.push('-', { label: forGood ? 'Delete for good…' : 'Delete…', ic: 'trash', sc: fkKeyOf('delete') || 'Del', danger: true, lock: lockIf('deleting'), run: () => actOn(p, idx, 'delete') });
     showMenu(x, y, one ? base(path) : `${its.length.toLocaleString()} ticked items`, items);
@@ -1748,7 +1764,7 @@
     let rd = null;
     const end = () => { if (rd) clearTimeout(rd.t); rd = null; };
     p.list.addEventListener('pointerdown', e => {
-      if (e.button !== 2 || e.pointerType !== 'mouse' || e.shiftKey || !rtickOn() || p.gal || p.mt) return;
+      if (e.button !== 2 || e.pointerType !== 'mouse' || e.shiftKey || !rtickOn() || tilesOn(p)) return;
       const i = rowIdx(e); end();
       if (i == null || !p.items[i] || p.items[i].up) return;
       setActive(p.i);
@@ -1977,7 +1993,7 @@
       return clipTake(p, p.sel.size ? [...p.sel].sort((a, b) => a - b) : [p.cursor], k === 'x' ? 'cut' : 'copy');
     }
     if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) { e.preventDefault(); return menuAtCursor(); }
-    if ((p.gal || p.mt) && /^Arrow(Up|Down|Left|Right)$/.test(e.key) && !e.shiftKey) {
+    if (tilesOn(p) && /^Arrow(Up|Down|Left|Right)$/.test(e.key) && !e.shiftKey) {
       e.preventDefault();
       const c = galCols(p);
       return moveCursor(p, p.cursor + { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -c, ArrowDown: c }[e.key]);
@@ -2704,12 +2720,30 @@
   }
 
   /* ---------- image & PDF viewer (F2 on those files) ---------- */
-  const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif', 'heic', 'heif', 'tif', 'tiff', 'svg']);
+  /* RAW photos (Fuji, Nikon, Canon, Sony, DNG, Olympus, Panasonic, Pentax, Samsung): shown from the
+   * camera's own JPG preview inside the file - the server finds it, nothing to install */
+  const RAWX = /\.(raf|nef|nrw|cr2|cr3|arw|srf|sr2|dng|orf|rw2|pef|srw)$/i;
+  const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif', 'heic', 'heif', 'tif', 'tiff', 'svg', 'raf', 'nef', 'nrw', 'cr2', 'cr3', 'arw', 'srf', 'sr2', 'dng', 'orf', 'rw2', 'pef', 'srw']);
   const rawUrl = path => `${API}?action=raw&path=${encodeURIComponent(path)}`;
+  const prevUrl = path => `${API}?action=rawprev&path=${encodeURIComponent(path)}`;
+  const picUrl = path => RAWX.test(path) ? prevUrl(path) : rawUrl(path);   // what an <img> can show
+  /* a photo's details (camera, lens, exposure, date, place) - read on the server, kept for the session */
+  const EXIF_OK = /\.(jpe?g|heic|heif|tiff?|webp|png|avif|raf|nef|nrw|cr2|cr3|arw|srf|sr2|dng|orf|rw2|pef|srw)$/i;
+  const metaCache = new Map();
+  function photoMeta(path) {
+    if (!metaCache.has(path)) metaCache.set(path, api('photo_meta', { path }).catch(e => { metaCache.delete(path); return { sections: [], gps: null, err: e.message }; }));
+    return metaCache.get(path);
+  }
+  const mapUrl = ([la, lo]) => `https://www.google.com/maps/search/?api=1&query=${la},${lo}`;
+  function metaHtml(m, fileRows = []) {
+    const sec = (t, rows, extra = '') => rows.length || extra ? `<div class="ex-sec"><div class="ex-h">${esc(t)}</div>${rows.map(([l, v]) => `<div class="ex-r"><span class="ex-l">${esc(l)}</span><span class="ex-v">${esc(v)}</span></div>`).join('')}${extra}</div>` : '';
+    const parts = (m.sections || []).map(([t, rows]) => sec(t, rows, t === 'Location' && m.gps ? `<a class="ex-map" href="${esc(mapUrl(m.gps))}" target="_blank" rel="noopener noreferrer">Show on Google Maps ↗</a>` : ''));
+    return (fileRows.length ? sec('File', fileRows) : '') + (parts.join('') || `<div class="ex-none muted">${m.err ? esc(m.err) : 'No camera details in this picture.'}</div>`);
+  }
   function openMedia(path, o = {}) {
     const ext = (path.split('.').pop() || '').toLowerCase();
     const backBtn = o.back ? [{ label: '‹ Results', run: () => { o.back(); return false; } }] : [];
-    const newTab = { label: 'Open in new tab', title: 'Full-screen in its own browser tab', run: () => { window.open(rawUrl(cur()), '_blank', 'noopener'); return false; } };
+    const newTab = { label: 'Open in new tab', title: 'Full-screen in its own browser tab', run: () => { window.open(picUrl(cur()), '_blank', 'noopener'); return false; } };
     if (ext === 'pdf') {
       openDlg(base(path), `
         <div class="vw-meta mono">${esc(path)}</div>
@@ -2726,32 +2760,41 @@
     let i = Math.max(0, list.indexOf(path));
     const cur = () => list[i];
     openDlg(base(path), `
-      <div class="mv-stage"><img class="mv-img" alt=""></div>
-      <div class="mv-meta"><span class="mv-name mono"></span><span class="mv-info muted"></span></div>`,
+      <div class="mv-wrap${store.get('mvside', true) ? '' : ' noside'}"><div class="mv-stage"><img class="mv-img" alt=""><button type="button" class="gp-nav prev" title="Previous picture (←)">‹</button><button type="button" class="gp-nav next" title="Next picture (→)">›</button></div><aside class="mv-side" aria-label="Photo details"></aside></div>
+      <div class="mv-meta"><span class="mv-name mono"></span><button type="button" class="mv-tog" title="Show or hide the photo details">Details</button><span class="mv-info muted"></span></div>`,
       [...backBtn,
-       { label: '‹ Prev', run: () => { show(i - 1); return false; } },
-       { label: 'Next ›', run: () => { show(i + 1); return false; } },
-       { label: 'Edit picture', title: 'Rotate, flip, crop, resize or change the type', run: () => { if (!EDIT_IMG.test(cur())) { toast("This kind of picture can't be edited here", true); return false; } openImageEditor(cur()); return false; } },
-       newTab, { label: 'Close', primary: true }], 'full');
-    const stage = $('.mv-stage', dlg), img = $('.mv-img', dlg);
+       { label: 'Edit picture', title: 'Rotate, flip, crop, resize or change the type', run: () => { if (!EDIT_IMG.test(cur())) { toast(RAWX.test(cur()) ? 'RAW photos are never changed here - right-click it and Save as JPG to edit a copy' : "This kind of picture can't be edited here", true); return false; } openImageEditor(cur()); return false; } },
+       newTab, { label: 'Close', primary: true }], 'full mv-dlg');
+    const stage = $('.mv-stage', dlg), img = $('.mv-img', dlg), side = $('.mv-side', dlg), wrap = $('.mv-wrap', dlg);
+    $('.mv-tog', dlg).addEventListener('click', () => { const on = wrap.classList.toggle('noside'); store.set('mvside', !on); });
+    /* the details column: the file, then what the camera wrote */
+    const drawSide = () => {
+      const want = cur(), st = p.stats.get(base(want)) || {};
+      const fileRows = [['Name', base(want)], img.naturalWidth && cur() === want ? ['Shown', `${img.naturalWidth} × ${img.naturalHeight}${RAWX.test(want) ? ' (camera preview)' : ''}`] : null,
+        st.s != null ? ['File size', fmtBytes(st.s)] : null, st.m ? ['Modified', fmtDate(st.m)] : null].filter(Boolean);
+      if (!EXIF_OK.test(want)) { side.innerHTML = metaHtml({ sections: [] }, fileRows).replace('No camera details in this picture.', 'This kind of picture has no camera details.'); return; }
+      side.innerHTML = metaHtml({ sections: [] }, fileRows).replace(/<div class="ex-none[^]*$/, '') + '<div class="ex-none muted">Reading the details…</div>';
+      photoMeta(want).then(m => { if (cur() === want) side.innerHTML = metaHtml(m, fileRows); });
+    };
     const btns = $$('.dlg-foot .uc-btn', dlg), off = backBtn.length;
     function show(n) {
       if (n < 0 || n >= list.length) return;
       i = n;
       stage.classList.remove('zoom'); stage.classList.add('loading');
       delete img.dataset.conv;
-      img.src = rawUrl(cur());
+      img.src = picUrl(cur());
       $('.dlg-head', dlg).textContent = base(cur());
       $('.mv-name', dlg).textContent = base(cur());
       $('.mv-info', dlg).textContent = list.length > 1 ? `${i + 1} of ${list.length}` : '';
-      setTimeout(() => { btns[off].disabled = i === 0; btns[off + 1].disabled = i === list.length - 1; });
-      if (list.length < 2) { btns[off].hidden = btns[off + 1].hidden = true; }
+      $('.gp-nav.prev', stage).disabled = i === 0; $('.gp-nav.next', stage).disabled = i === list.length - 1;   // ‹ › over the picture
+      setTimeout(() => { btns[off].hidden = RAWX.test(cur()); });   // RAW: never edited
     }
     img.addEventListener('load', () => {
       stage.classList.remove('loading');
       const s = p.stats.get(base(cur())) || {};
-      $('.mv-info', dlg).textContent = [img.naturalWidth ? `${img.naturalWidth} × ${img.naturalHeight}` : '', s.s != null ? fmtBytes(s.s) : '',
+      $('.mv-info', dlg).textContent = [img.naturalWidth ? `${img.naturalWidth} × ${img.naturalHeight}${RAWX.test(cur()) ? ' camera preview' : ''}` : '', s.s != null ? fmtBytes(s.s) : '',
         list.length > 1 ? `${i + 1} of ${list.length}` : ''].filter(Boolean).join(' · ');
+      drawSide();
     });
     img.addEventListener('error', () => {
       if (HEIC.test(cur()) && !img.dataset.conv) {          // not Safari: convert it here
@@ -2759,9 +2802,11 @@
         const want = cur();
         return heicUrl(want).then(u => { if (cur() === want) img.src = u; }, e => { stage.classList.remove('loading'); $('.mv-info', dlg).textContent = e.message; });
       }
-      stage.classList.remove('loading'); $('.mv-info', dlg).textContent = "This browser can't show this image type.";
+      stage.classList.remove('loading'); $('.mv-info', dlg).textContent = RAWX.test(cur()) ? "No preview found inside this RAW file." : "This browser can't show this image type.";
     });
     img.addEventListener('click', () => stage.classList.toggle('zoom'));   // tap: fit ↔ actual size
+    $('.gp-nav.prev', stage).addEventListener('click', e => { e.stopPropagation(); show(i - 1); });
+    $('.gp-nav.next', stage).addEventListener('click', e => { e.stopPropagation(); show(i + 1); });
     dlg.extraKey = e => {
       if (e.key === 'ArrowRight') { e.preventDefault(); show(i + 1); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); show(i - 1); }
@@ -3186,10 +3231,10 @@
    * F-keys, Copy/Cut/Paste and drag all work as in the list. Leaving puts both
    * panes back as they were. Small pictures come from the server (PHP's GD,
    * kept in RAM); HEIC ones are made in the browser. */
-  const GAL_IMG = /\.(jpe?g|png|gif|webp|bmp|avif|svg|heic|heif|tiff?|ico)$/i;
+  const GAL_IMG = /\.(jpe?g|png|gif|webp|bmp|avif|svg|heic|heif|tiff?|ico|raf|nef|nrw|cr2|cr3|arw|srf|sr2|dng|orf|rw2|pef|srw)$/i;
   const GAL_VID = /\.(mp4|m4v|mov|mkv|webm|avi|wmv|ts|m2ts|mpe?g|vob)$/i;
   const GAL_AUD = /\.(mp3|m4a|m4b|aac|flac|ogg|oga|opus|wav|wma|aiff?|alac|ape|wv|mka|ac3|eac3|dts|mp2|amr|caf|dsf|dff|weba)$/i;
-  const THUMB_OK = /\.(jpe?g|png|gif|webp|bmp|avif)$/i;
+  const THUMB_OK = /\.(jpe?g|png|gif|webp|bmp|avif|raf|nef|nrw|cr2|cr3|arw|srf|sr2|dng|orf|rw2|pef|srw)$/i;   // made on the server (RAW: from its preview)
   const GAL_SIZES = { s: [110, 240], m: [160, 320], l: [230, 480] };
   const thumbUrl = (path, s) => `${API}?action=thumb&s=${s}&path=${encodeURIComponent(path)}`;
   const GI = {
@@ -3207,16 +3252,103 @@
     return n >= 5 || (n > 0 && n / f >= .25);
   }
   const galSize = () => GAL_SIZES[store.get('galSize', 'm')] || GAL_SIZES.m;
+  /* Gallery only: the line between the panes can be dragged (20-80%), double-click for half and half.
+   * The width is kept for next time you use Gallery; outside Gallery the panes are always 50/50. */
+  const splitEl = document.createElement('div');
+  splitEl.className = 'uc-splitter'; splitEl.title = "Drag to change the panes' widths - double-click for half and half";
+  $('.uc-panes', root).appendChild(splitEl);
+  function splitPos() {
+    if (!root.classList.contains('uc-galsplit')) return;
+    const pr = $('.uc-panes', root).getBoundingClientRect(), a = panes[0].el.getBoundingClientRect();
+    splitEl.style.left = (a.right - pr.left + 4) + 'px';
+  }
+  /* the gallery side keeps its width in pixels: making the browser bigger or smaller only changes the preview */
+  const GAL_MIN = 150, PREV_MIN = 360;
+  function splitBox() { const box = $('.uc-panes', root), cs = getComputedStyle(box); return [box, parseFloat(cs.paddingLeft), box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)]; }
+  function splitSet(px) {
+    const [, , cw] = splitBox(), half = (cw - 8) / 2;
+    if (!px) px = half;
+    px = Math.round(Math.max(Math.min(GAL_MIN, half), Math.min(px, cw - 8 - PREV_MIN)));
+    root.style.setProperty('--gal-left', px + 'px'); splitPos(); galFitAll();
+    return px;
+  }
+  /* Gallery cards keep their size (S/M/L) and wrap like icons in a file window. A pane too narrow
+   * for one card of that size uses S cards; too narrow for two S cards, it becomes the normal file
+   * list (the preview stays). The list drops columns from the right before a name would be cut. */
+  var measureCtx = null;
+  function nameWidth(p) {
+    const el = $('.uc-row .nm', p.list) || $('.uc-list', p.el);
+    measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+    const cs = getComputedStyle(el); measureCtx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    let w = 0; for (const it of p.items.slice(0, 3000)) w = Math.max(w, measureCtx.measureText(it.up ? '..' : it.n).width);
+    return Math.ceil(w);
+  }
+  function galFit(p) {
+    const on = root.classList.contains('uc-galsplit') && p.gal && !p.mt;
+    const inner = p.el.clientWidth - 18, T = galSize()[0], S = GAL_SIZES.s[0];
+    const list = on && inner < S * 2 + 8;      // not even two S cards side by side: a list says more
+    if (on && !list) p.el.style.setProperty('--tile', (inner < T ? S : T) + 'px');
+    p.el.classList.toggle('gal-narrow', on && p.el.clientWidth < 470);
+    if (list !== !!p.galList) {
+      p.galList = list; p.galItems = null;
+      p.el.classList.toggle('gal', !!p.gal && !list); p.el.classList.toggle('gal-list', list);
+      if (!list) { p.colCut = null; applyCols(p); }
+      draw(p); moveCursor(p, p.cursor, true);
+    }
+    if (list) {
+      const c = store.get('cols' + p.i, {}), fs = parseFloat(getComputedStyle(root).getPropertyValue('--fs')) || 1;
+      const want = COLS.filter(([k]) => colWanted(c, k) && (k !== 'disk' || userView(p)));
+      let room = p.el.clientWidth - 36 - 10 - 24 - 14 - nameWidth(p);
+      const cut = new Set(); let used = want.reduce((t, [, , w]) => t + parseFloat(w) * fs, 0);
+      for (let k = want.length - 1; k >= 0 && used > room; k--) { cut.add(want[k][0]); used -= parseFloat(want[k][2]) * fs; }
+      const key = [...cut].join();
+      if (key !== (p.colCut ? [...p.colCut].join() : '')) { p.colCut = cut.size ? cut : null; applyCols(p); }
+    }
+  }
+  const galFitAll = () => panes.forEach(galFit);
+  function splitSync() {
+    const on = panes.some(q => q.gal);
+    root.classList.toggle('uc-galsplit', on);
+    if (on) splitSet(+store.get('galsplitpx', 0) || 0); else root.style.removeProperty('--gal-left');
+    galFitAll();
+    requestAnimationFrame(() => { splitPos(); galFitAll(); });
+    if (!on) panes.forEach(q => { if (q.galList) { q.galList = false; q.el.classList.remove('gal-list'); } });
+  }
+  splitEl.addEventListener('pointerdown', e => {
+    e.preventDefault(); splitEl.setPointerCapture(e.pointerId); splitEl.classList.add('drag'); root.classList.add('uc-splitting');
+    const [box, pl] = splitBox();
+    let last = 0;
+    const move = ev => { last = splitSet(ev.clientX - box.getBoundingClientRect().left - pl - 4); };
+    const up = () => {
+      splitEl.removeEventListener('pointermove', move); splitEl.removeEventListener('pointerup', up); splitEl.removeEventListener('pointercancel', up);
+      splitEl.classList.remove('drag'); root.classList.remove('uc-splitting');
+      if (last) store.set('galsplitpx', last);
+      panes.forEach(q => { if (q.gal) galScroll(q); });
+    };
+    splitEl.addEventListener('pointermove', move); splitEl.addEventListener('pointerup', up); splitEl.addEventListener('pointercancel', up);
+  });
+  splitEl.addEventListener('dblclick', () => { store.set('galsplitpx', 0); splitSet(0); });
+  window.addEventListener('resize', () => requestAnimationFrame(() => { if (root.classList.contains('uc-galsplit')) splitSet(+store.get('galsplitpx', 0) || 0); }));
   function galSet(p, on) {
     const q = panes[1 - p.i];
     if (on) { if (q.gal) galSet(q, false); if (cmpOn) endCompare(true); }
     p.gal = !!on; store.set('gal' + p.i, p.gal);
+    p.galRoot = p.gal ? p.path : null;
+    if (p.gal) {                                   // start on the first picture (not on "..")
+      const cur = p.items[p.cursor];
+      if (!cur || cur.up || itDir(p, cur) || !GAL_IMG.test(cur.n)) {
+        let k = p.items.findIndex(t => !t.up && !itDir(p, t) && GAL_IMG.test(t.n));
+        if (k < 0) k = p.items.findIndex(t => !t.up && !itDir(p, t));
+        if (k >= 0) p.cursor = k;
+      }
+    }
     p.el.classList.toggle('gal', p.gal);
     p.galItems = null; p.galLast = -1;
     if (p.gal) { p.el.style.setProperty('--tile', galSize()[0] + 'px'); galPrevMake(q, p); }
     else { galPrevRemove(q); p.list.scrollTop = Math.max(0, p.cursor * ROW - p.list.clientHeight / 2); }
     if (p.mode === 'dir') applySort(p); else draw(p);
     if (p.gal) setTimeout(() => galScroll(p), 30);
+    splitSync();
   }
   function galCols(p) {
     const cur = $(`.uc-tile[data-idx="${p.cursor}"]`, p.list);
@@ -3243,7 +3375,7 @@
     else pic = `<span class="tl-ic">${GAL_VID.test(it.n) ? GI.vid : GAL_AUD.test(it.n) ? GI.aud : GAL_IMG.test(it.n) ? GI.pic : GI.file}</span>`;
     return `<div class="uc-row uc-tile${p.sel.has(i) ? ' sel' : ''}${i === p.cursor ? ' cursor' : ''}${cm ? ' clip-' + cm : ''}" data-idx="${i}"${!it.up && finePointer() ? ' draggable="true"' : ''} title="${esc(it.up ? 'Up one folder' : it.n)}">
       ${it.up ? '' : `<div class="col-sel"><span class="box${p.sel.has(i) ? ' on' : ''}"></span></div>`}
-      <div class="tl-pic">${pic}${ext && !THUMB_OK.test(it.n) ? `<span class="tl-ext">${esc(ext)}</span>` : ''}</div>
+      <div class="tl-pic">${pic}${ext && (!THUMB_OK.test(it.n) || RAWX.test(it.n)) ? `<span class="tl-ext">${esc(ext)}</span>` : ''}</div>
       <div class="nm${dir ? ' dir' : ''}">${it.up ? '..' : cm ? `<span class="nm-t ${cm}">${esc(it.n)}</span>` : esc(it.n)}</div>${p.mt && dir && !it.up ? `<div class="tl-sub">${esc(musSub(p, it))}</div>` : ''}${cm ? `<span class="clip-tag ${cm}">${cm === 'cut' ? '✂ cut' : cm === 'del' ? '🗑 to delete' : '⧉ copy'}</span>` : ''}</div>`;
   }
   /* HEIC tiles: made in the browser, only for the ones scrolled into view */
@@ -3297,16 +3429,24 @@
     el.className = 'uc-gprev';
     el.innerHTML = `<div class="gp-head"><span class="gp-t">Preview</span><span class="gp-name"></span><button type="button" class="uc-btn gp-x" title="Back to the list (this pane shows its folder again)">✕ Close gallery</button></div>
       <div class="gp-body"></div><div class="gp-foot"><span class="gp-info muted"></span><span class="gp-btns"></span></div>`;
+    if (gpRO) gpRO.observe($('.gp-body', el));
     $('.uc-box', q.el).appendChild(el);
     q.prev = el;
     el.addEventListener('mousedown', e => { e.stopPropagation(); setActive(p.i); });
     $('.gp-x', el).addEventListener('click', () => galSet(p, false));
+    /* Details on/off: the photo's details beside or under the picture */
+    $('.gp-btns', el).addEventListener('change', e => {
+      if (!e.target.matches('[data-gpex]')) return;
+      store.set('gpex', e.target.checked);
+      const body = $('.gp-body', el); body.classList.toggle('ex-off', !e.target.checked); gpLayout(body);
+    });
     $('.gp-btns', el).addEventListener('click', e => {
       const b = e.target.closest('[data-gp]'); if (!b) return;
       const it = p.items[p.cursor]; if (!it || it.up) return;
       if (b.dataset.gp === 'view') openItem(p, p.cursor);
       if (b.dataset.gp === 'edit') openImageEditor(fullPath(p, it));
-      if (b.dataset.gp === 'tab') window.open(rawUrl(fullPath(p, it)), '_blank', 'noopener');
+      if (b.dataset.gp === 'tab') window.open(picUrl(fullPath(p, it)), '_blank', 'noopener');
+      if (b.dataset.gp === 'rawjpg') heicToJpg([fullPath(p, it)]);
       if (b.dataset.gp === 'play') musPlayFile(fullPath(p, it));
       if (b.dataset.gp === 'add') plAdd([fullPath(p, it)]);
     });
@@ -3316,19 +3456,51 @@
     const q = panes[1 - p.i], el = q.prev; if (!el || !p.gal) return;
     const it = p.items[p.cursor], body = $('.gp-body', el), info = $('.gp-info', el), btns = $('.gp-btns', el);
     $('.gp-name', el).textContent = it ? (it.up ? '..' : it.n) : '';
-    killMedia(body); body.innerHTML = ''; info.textContent = ''; btns.innerHTML = ''; delete info.dataset.px;
-    if (!it || it.up) { body.innerHTML = `<span class="gp-ic">${GI.up}</span>`; return; }
+    killMedia(body); body.innerHTML = ''; body.classList.remove('has-ex', 'ex-right', 'ex-bottom'); info.textContent = ''; btns.innerHTML = ''; delete info.dataset.px;
+    if (!it || it.up) { body.innerHTML = it ? `<div class="gp-msg">Up to ${esc(base(parent(p.path)) || '/')} - double-click to go up</div>` : ''; return; }
     const path = fullPath(p, it), want = path;
-    if (itDir(p, it)) { body.innerHTML = `<span class="gp-ic">${GI.dir}</span>`; info.textContent = 'Folder - double-click or Enter opens it'; return; }
+    if (itDir(p, it)) {
+      /* a folder: a fan of the pictures in it (poster / folder / cover first) - blank cards while it's read */
+      body.innerHTML = `<div class="gp-fan loading">${[2, 1, 0].map(k => `<span class="fc fc${k}"></span>`).join('')}</div><div class="gp-msg">${esc(it.n)}</div>`;
+      info.textContent = 'Folder - double-click or Enter opens it';
+      folderPics(path).then(f => {
+        if (!body.isConnected || p.items[p.cursor] !== it) return;
+        const fan = $('.gp-fan', body), picks = f.pics.slice(0, 3);
+        fan.classList.remove('loading');
+        if (picks.length) fan.innerHTML = [2, 1, 0].map(k => picks[k] ? `<img class="fc fc${k}" alt="" src="${esc(thumbUrl(join(path, picks[k]), 480))}">` : `<span class="fc fc${k}"></span>`).join('');
+        else { fan.classList.add('empty'); $('.fc0', fan).innerHTML = GI.dir; }
+        const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+        const parts = [f.nPics ? pl(f.nPics, 'picture') : '', f.nOther ? pl(f.nOther, f.nPics ? 'other file' : 'file') : '', f.nDirs ? pl(f.nDirs, 'folder') : ''].filter(Boolean);
+        $('.gp-msg', body).textContent = f.err ? `${it.n} - ${f.err}` : `${it.n} · ${parts.join(' · ') || 'empty'}`;
+      });
+      return;
+    }
     const B = (k, l) => `<button type="button" class="uc-btn" data-gp="${k}">${l}</button>`;
     if (GAL_IMG.test(it.n)) {
       const img = document.createElement('img'); img.alt = '';
-      if (THUMB_OK.test(it.n)) { img.src = thumbUrl(path, 640); const full = new Image(); full.onload = () => { if (img.isConnected) img.src = full.src; }; full.src = rawUrl(path); }
+      if (THUMB_OK.test(it.n)) { img.src = thumbUrl(path, 640); const full = new Image(); full.onload = () => { if (img.isConnected) img.src = full.src; }; full.src = picUrl(path); }
       else img.src = rawUrl(path);
       img.onerror = () => { if (HEIC.test(path) && !img.dataset.conv) { img.dataset.conv = '1'; heicUrl(path).then(u => { if (img.isConnected) img.src = u; }, er => { info.textContent = er.message; }); } };
       img.onload = () => { if (img.naturalWidth && !img.src.includes('action=thumb')) info.dataset.px = `${img.naturalWidth} × ${img.naturalHeight}`; galInfo(p, it, info); };
-      body.appendChild(img);
-      btns.innerHTML = B('view', 'View') + (EDIT_IMG.test(it.n) ? B('edit', 'Edit picture') : '') + B('tab', 'New tab');
+      const pic = document.createElement('div'); pic.className = 'gp-pic'; pic.appendChild(img); body.appendChild(pic);
+      /* ‹ › over the picture: the previous / next picture in the gallery */
+      const g = panes.find(x => x.gal) || p, picIdx = dir => { for (let k = g.cursor + dir; k >= 0 && k < g.items.length; k += dir) { const t = g.items[k]; if (!t.up && !itDir(g, t) && GAL_IMG.test(t.n)) return k; } return -1; };
+      for (const [cls, dir, lab] of [['prev', -1, '‹'], ['next', 1, '›']]) {
+        const k = picIdx(dir), b = document.createElement('button');
+        b.type = 'button'; b.className = 'gp-nav ' + cls; b.textContent = lab; b.title = dir < 0 ? 'Previous picture' : 'Next picture'; b.disabled = k < 0;
+        b.addEventListener('click', e => { e.stopPropagation(); const n = picIdx(dir); if (n >= 0) moveCursor(g, n); });
+        pic.appendChild(b);
+      }
+      img.addEventListener('load', () => gpLayout(body));
+      /* beside or under the picture: what the camera wrote */
+      if (EXIF_OK.test(it.n)) photoMeta(path).then(m => {
+        if (!img.isConnected || !(m.sections || []).length) return;
+        const ex = document.createElement('div'); ex.className = 'gp-ex'; ex.innerHTML = metaHtml(m);
+        body.classList.add('has-ex'); body.classList.toggle('ex-off', !store.get('gpex', true)); body.appendChild(ex); gpLayout(body);
+        /* the Details tick box - only for a picture that has details to show */
+        if (!$('[data-gpex]', btns)) btns.insertAdjacentHTML('afterbegin', `<label class="chk gp-exchk" title="Show the photo's details"><input type="checkbox" data-gpex${store.get('gpex', true) ? ' checked' : ''}> Details</label>`);
+      });
+      btns.innerHTML = B('view', 'View') + (EDIT_IMG.test(it.n) ? B('edit', 'Edit picture') : '') + (RAWX.test(it.n) ? B('rawjpg', 'Save as JPG') : '') + B('tab', 'View Image in New Tab');
     } else if (GAL_AUD.test(it.n)) {
       /* a song: its cover, and buttons - nothing starts by itself, so the player at the bottom isn't interrupted */
       body.innerHTML = `<img class="gp-cover" alt="" src="${esc(`${API}?action=cover&path=${encodeURIComponent(path)}`)}"><span class="gp-ic" hidden>${GI.aud}</span>`;
@@ -3345,6 +3517,43 @@
     } else body.innerHTML = `<span class="gp-ic">${GI.file}</span>`;
     galInfo(p, it, info);
   }
+  /* what's in a folder, for its fan in the Gallery preview: one listing, only when the folder is picked */
+  const folderPeekCache = new Map();
+  function folderPics(path) {
+    if (!folderPeekCache.has(path)) folderPeekCache.set(path, api('list', { path }).then(r => {
+      const its = r.items || [], first = /^(poster|folder|cover|season\d*-poster|show)\.(jpe?g|png|webp)$/i;
+      const pics = its.filter(([n, t]) => t !== 'd' && GAL_IMG.test(n) && !n.startsWith('.')).map(([n]) => n)
+        .sort((a, b) => (first.test(b) ? 1 : 0) - (first.test(a) ? 1 : 0) || a.localeCompare(b, undefined, { numeric: true }));
+      return { pics, nPics: pics.length, nDirs: its.filter(([, t]) => t === 'd').length, nOther: its.filter(([n, t]) => t !== 'd' && !(GAL_IMG.test(n) && !n.startsWith('.'))).length };
+    }).catch(e => { folderPeekCache.delete(path); return { pics: [], nPics: 0, nDirs: 0, err: e.message }; }));
+    return folderPeekCache.get(path);
+  }
+  /* Gallery preview with photo details: the details go under the picture or beside it - whichever
+   * leaves the picture bigger - and take only the room they need */
+  function gpLayout(body) {
+    const ex = $('.gp-ex', body), img = $('.gp-pic img', body);
+    if (body.classList.contains('ex-off')) { body.classList.remove('ex-right', 'ex-bottom'); return; }
+    if (!ex || !img || !img.naturalWidth || !body.isConnected) return;
+    const cs = getComputedStyle(body), W = body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+      H = body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom), a = img.naturalWidth / img.naturalHeight, gap = 10, RW = 300;
+    const was = body.classList.contains('ex-right') ? 'r' : body.classList.contains('ex-bottom') ? 'b' : '';
+    const before = was ? [img.getBoundingClientRect(), ex.getBoundingClientRect()] : null;
+    body.classList.remove('ex-right'); body.classList.add('ex-bottom');
+    const mh = Math.min(ex.scrollHeight + 2, H * .55);
+    const under = Math.min(W, Math.max(0, H - mh - gap) * a, img.naturalWidth);
+    const beside = Math.min(W - RW - gap, H * a, img.naturalWidth);
+    const now = beside > under + 8 ? 'r' : 'b';
+    if (now === 'r') { body.classList.remove('ex-bottom'); body.classList.add('ex-right'); }
+    /* moving from under to beside (or back): slide the picture and the details to their new places */
+    if (before && was !== now && img.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      [[img, before[0]], [ex, before[1]]].forEach(([el, r0]) => {
+        const r1 = el.getBoundingClientRect(); if (!r1.width || !r1.height) return;
+        el.animate([{ transformOrigin: '0 0', transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top}px)` + (el === img ? ` scale(${r0.width / r1.width}, ${r0.height / r1.height})` : ''), opacity: el === ex ? 0 : 1 },
+          { transformOrigin: '0 0', transform: 'none', opacity: 1 }], { duration: 320, easing: 'cubic-bezier(.65,0,.35,1)' });
+      });
+    }
+  }
+  const gpRO = 'ResizeObserver' in window ? new ResizeObserver(es => es.forEach(e => requestAnimationFrame(() => gpLayout(e.target)))) : null;
   async function galInfo(p, it, info) {
     const k = it.abs || it.n;
     let s = p.stats.get(k);
@@ -5363,14 +5572,21 @@
 
   /* Convert HEIC photos to JPG: each gets a .jpg next to it (never overwriting),
    * all in one History step. */
+  /* a RAW photo's preview as a JPG file's contents */
+  async function rawBlob(path) {
+    const r = await fetch(prevUrl(path), { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(r.status === 415 ? 'no preview found inside it' : `the server said ${r.status}`);
+    return r.blob();
+  }
   async function heicToJpg(paths) {
     let hist = null, ok = 0; const bad = [];
     for (const [i, path] of paths.entries()) {
       toast(`Converting ${i + 1} of ${paths.length}: ${base(path)}…`);
       try {
-        const blob = await heicConvert(path, 'image/jpeg', 1);
-        const r = await putFile(blob, path, 'new', base(path).replace(/\.hei[cf]$/i, '.jpg'),
-          hist ? { join: hist, label: `Converted ${i + 1} HEIC picture${i ? 's' : ''} to JPG` } : { label: `Converted ${base(path)} to JPG` });
+        const raw = RAWX.test(path);
+        const blob = raw ? await rawBlob(path) : await heicConvert(path, 'image/jpeg', 1);
+        const r = await putFile(blob, path, 'new', base(path).replace(raw ? RAWX : /\.hei[cf]$/i, '.jpg'),
+          hist ? { join: hist, label: `Converted ${i + 1} picture${i ? 's' : ''} to JPG` } : { label: `Converted ${base(path)} to JPG` });
         hist = r.hist || hist; ok++;
       } catch (e) { bad.push(`${base(path)}: ${e.message}`); if (/reinstall/.test(e.message)) break; }
     }
@@ -5949,7 +6165,8 @@
       let err = '';
       let re = null;
       if (st.mode === 'replace' && st.find) {
-        try { re = new RegExp(st.regex ? st.find : reEsc(st.find), (st.first ? '' : 'g') + (st.mcase ? '' : 'i') + 'u'); }
+        const fnd = st.find.normalize('NFC');
+        try { re = new RegExp(st.regex ? fnd : reEsc(fnd), (st.first ? '' : 'g') + (st.mcase ? '' : 'i') + 'u'); }
         catch (e) { err = 'That pattern isn\'t valid: ' + e.message; }
       }
       const order = [...items].sort((a, b) => st.order === 'date' ? (a.m - b.m) || collator.compare(a.n, b.n) : collator.compare(a.n, b.n));
@@ -5959,8 +6176,13 @@
         const [stem, ext] = split(it);
         let nw = stem, hiOld = esc(stem), hiNew = null;
         if (st.mode === 'replace' && re) {
-          nw = stem.replace(re, st.repl);
-          if (nw !== stem) {
+          /* names can spell an accent two ways (é as one character, or e plus an accent mark - common on files from a Mac);
+           * what you type is the first kind, so compare in that form. A name where nothing is found stays exactly as it was */
+          const sN = stem.normalize('NFC');
+          nw = sN.replace(re, st.repl);
+          if (nw === sN) nw = stem;
+          else {
+            const stem = sN;
             try { hiOld = stem.replace(re, m => '\u0001' + m + '\u0002'); hiOld = esc(hiOld).replace(/\u0001/g, '<mark class="del">').replace(/\u0002/g, '</mark>'); } catch (e) {}
             try { hiNew = esc(stem.replace(re, m => '\u0001' + m.replace(new RegExp(re.source, re.flags.replace('g', '')), st.repl) + '\u0002')).replace(/\u0001/g, '<mark class="add">').replace(/\u0002/g, '</mark>'); } catch (e) {}
           }
@@ -5997,10 +6219,16 @@
 
     const modeTabs = [['replace', 'Replace text'], ['add', 'Add text'], ['number', 'Number'], ['case', 'Change case']];
     openDlg('Batch rename', `
+      <div class="br-saved"><span class="br-sl">Saved</span>
+        <div class="br-pickw"><button type="button" class="br-pick" title="Your saved rules"><span class="t"></span><span class="v" aria-hidden="true">▾</span></button><div class="br-list br-rlist" hidden></div></div>
+        <span class="br-savebox" hidden><input type="text" class="br-sname" placeholder="Name this rule, e.g. Dots to spaces" maxlength="40" spellcheck="false"><button type="button" class="uc-btn br-sok">Save</button><button type="button" class="uc-btn br-sno">Cancel</button></span>
+        <button type="button" class="br-saveas">Save these settings as…</button>
+        <div class="br-snote" hidden></div></div>
       <div class="br-top"><span class="br-seg">${modeTabs.map(([k, l]) => `<button data-mode="${k}" class="${k === st.mode ? 'on' : ''}">${l}</button>`).join('')}</span>
         <span class="muted">${items.length} item${items.length === 1 ? '' : 's'} ticked in <span class="mono">${esc(folder || p.path)}</span></span></div>
       <div class="br-rules"></div>
       <details class="br-help"><summary></summary><div class="br-help-body"></div></details>
+      <details class="br-help br-rx"><summary>Regex cheat sheet - ready-made patterns to click</summary><div class="br-rx-body">${BR_RX}</div></details>
       <div class="br-err uc-error" hidden></div>
       <div class="br-tbl"><div class="br-tr h"><div></div><div>Now</div><div></div><div>After</div><div></div></div><div class="br-rows"></div></div>
       <div class="br-sum"></div>`,
@@ -6010,7 +6238,11 @@
     const go = $$('.dlg-foot .uc-btn', dlg).pop();
     const rulesEl = $('.br-rules', dlg), rowsEl = $('.br-rows', dlg), sumEl = $('.br-sum', dlg), errEl = $('.br-err', dlg);
     const chk = (k, l) => `<label class="chk"><input type="checkbox" data-k="${k}" ${st[k] ? 'checked' : ''}> ${l}</label>`;
-    const txt = (k, l, ph, w) => `<div class="field"${w ? ` style="max-width:${w}"` : ''}><label>${l}</label><input type="text" data-k="${k}" value="${esc(String(st[k]))}" placeholder="${esc(ph || '')}" spellcheck="false" autocapitalize="off" autocorrect="off"></div>`;
+    /* the text boxes; the ones that remember what you renamed with get a ▾ */
+    const HKEYS = ['find', 'repl', 'addText', 'pattern'];
+    const txt = (k, l, ph, w) => `<div class="field"${w ? ` style="max-width:${w}"` : ''}><label>${l}</label>${HKEYS.includes(k)
+      ? `<div class="br-in"><input type="text" data-k="${k}" value="${esc(String(st[k]))}" placeholder="${esc(ph || '')}" spellcheck="false" autocapitalize="off" autocorrect="off"><button type="button" class="br-dd" data-h="${k}" title="Used recently" aria-label="Used recently" tabindex="-1">▾</button><div class="br-list br-hlist" hidden></div></div>`
+      : `<input type="text" data-k="${k}" value="${esc(String(st[k]))}" placeholder="${esc(ph || '')}" spellcheck="false" autocapitalize="off" autocorrect="off">`}</div>`;
     /* Number help, worked through with the files you actually ticked */
     function numberHelp() {
       const ex = [...items].sort((a, b) => collator.compare(a.n, b.n)).filter(i => !i.dir).slice(0, 2);
@@ -6045,6 +6277,7 @@
     }
     function drawRules() {
       drawHelp();
+      $('.br-rx', dlg).hidden = st.mode !== 'replace';
       const keep = chk('keepExt', 'Leave extensions alone (.mkv, .jpg …)');
       rulesEl.innerHTML = st.mode === 'replace' ? `<div class="br-grid">${txt('find', 'Find', 'e.g. IMG_')}${txt('repl', 'Replace with', 'leave empty to remove it')}</div>
           <div class="radios">${chk('mcase', 'Match upper/lower case')}${chk('first', 'First match only')}${chk('regex', 'Advanced pattern (regex)')}${keep}</div>`
@@ -6060,7 +6293,8 @@
           <div class="radios">${keep}</div>`;
     }
     function drawRows() {
-      const err = compute();
+      let err;
+      try { err = compute(); } catch (e) { err = 'Something went wrong working out the new names: ' + e.message; items.forEach(it => { it.st = 'same'; it.new = it.n; }); }
       errEl.hidden = !err; errEl.textContent = err;
       const lim = 500;
       const ICON = { go: ['✓', 'will be renamed'], same: ['=', 'no change'], off: ['–', 'unticked - left alone'], bad: ['⚠', 'problem'] };
@@ -6095,6 +6329,95 @@
       inp.focus(); inp.setSelectionRange(pos + c.dataset.chip.length, pos + c.dataset.chip.length); drawRows();
     });
     rowsEl.addEventListener('change', e => { const i = e.target.dataset.i; if (i != null) { items[+i].on = e.target.checked; drawRows(); } });
+    /* the regex cheat sheet: "Use" fills Find and Replace with and ticks the regex box */
+    $('.br-rx', dlg).addEventListener('click', e => {
+      const u = e.target.closest('[data-rx]'); if (!u) return;
+      const [find, repl] = BR_RX_LIST[+u.dataset.rx];
+      Object.assign(st, { find, repl, regex: true }); drawRules(); drawRows();
+      const f = $('input[data-k="find"]', rulesEl); if (f) f.focus();
+    });
+
+    /* ---- saved rules (kept on the server, so every browser has them) and recently used values (kept in this browser) ---- */
+    const RKEYS = ['mode', 'find', 'repl', 'mcase', 'first', 'regex', 'keepExt', 'addText', 'addWhere', 'pattern', 'start', 'digits', 'order', 'caseTo'];
+    const CASES = { lower: 'lower case', upper: 'UPPER CASE', title: 'Title Case', sentence: 'Sentence case' };
+    const ruleSub = r => r.mode === 'replace' ? `Replace "${r.find}" → "${r.repl}"${r.regex ? ' · regex' : ''}`
+      : r.mode === 'add' ? `Add "${r.addText}" ${r.addWhere === 'after' ? 'after' : 'before'} the name`
+      : r.mode === 'number' ? `Number · ${r.pattern}${r.order === 'date' ? ' · by date' : ''}` : `Change case · ${CASES[r.caseTo] || ''}`;
+    const savedEl = $('.br-saved', dlg), rlist = $('.br-rlist', dlg), sbox = $('.br-savebox', dlg), sname = $('.br-sname', dlg), snote = $('.br-snote', dlg);
+    let rules = Array.isArray(SET.brrules) ? SET.brrules : [], picked = '';
+    const listsOpen = () => $$('.br-list', dlg).some(l => !l.hidden);
+    const listClose = () => $$('.br-list', dlg).forEach(l => { l.hidden = true; });
+    const drawPick = () => { const t = $('.br-pick .t', dlg); t.textContent = picked || (rules.length ? 'Pick a saved rule…' : 'No saved rules yet'); t.classList.toggle('ph', !picked); };
+    function openRules() {
+      listClose();
+      rlist.innerHTML = rules.length ? '<div class="h">Your saved rules - pick one to fill everything in</div>' + rules.map((r, i) => `<div class="r${r.name === picked ? ' hl' : ''}" data-r="${i}"><span class="n">${esc(r.name)}</span><span class="s">${esc(ruleSub(r))}</span><button type="button" class="x" data-del="${i}" title="Delete this rule" aria-label="Delete">✕</button></div>`).join('')
+        : '<div class="h">No saved rules yet</div><div class="e">Set up a rule the way you like it, then click <b>Save these settings as…</b></div>';
+      rlist.hidden = false;
+    }
+    function useRule(r) {
+      for (const k of RKEYS) if (k in r) st[k] = r[k];
+      picked = r.name;
+      $$('.br-seg button', dlg).forEach(x => x.classList.toggle('on', x.dataset.mode === st.mode));
+      drawRules(); drawRows(); drawPick();
+    }
+    async function rulesPut(list, msg) {
+      try { const r = await api('brrules_set', { rules: JSON.stringify(list) }); rules = SET.brrules = r.rules || []; }
+      catch (e) { toast(e.message, true); return false; }
+      drawPick(); if (msg) toast(msg); return true;
+    }
+    const saveMode = on => { sbox.hidden = !on; $('.br-saveas', dlg).hidden = on; $('.br-pickw', dlg).hidden = on; snote.hidden = true; if (on) { sname.value = picked; sname.focus(); sname.select(); sameNote(); } };
+    function sameNote() { const v = sname.value.trim().toLowerCase(), same = v && rules.find(r => r.name.toLowerCase() === v); snote.hidden = !same; if (same) snote.textContent = `This replaces your saved rule "${same.name}".`; }
+    async function saveRule() {
+      const n = sname.value.trim().replace(/\s+/g, ' ');
+      if (!n) { toast('Give the rule a name', true); sname.focus(); return; }
+      const same = rules.find(r => r.name.toLowerCase() === n.toLowerCase()), rule = { name: n };
+      for (const k of RKEYS) rule[k] = st[k];
+      const list = rules.filter(r => r !== same); list.splice(same ? rules.indexOf(same) : list.length, 0, rule);
+      if (await rulesPut(list, same ? `Replaced "${same.name}"` : `Saved "${n}"`)) { picked = n; drawPick(); saveMode(false); }
+    }
+    $('.br-pick', dlg).addEventListener('click', e => { e.stopPropagation(); if (rlist.hidden) openRules(); else listClose(); });
+    $('.br-saveas', dlg).addEventListener('click', () => { listClose(); saveMode(true); });
+    $('.br-sok', dlg).addEventListener('click', saveRule);
+    $('.br-sno', dlg).addEventListener('click', () => saveMode(false));
+    sname.addEventListener('input', sameNote);
+    rlist.addEventListener('click', e => {
+      e.stopPropagation();
+      const del = e.target.closest('[data-del]');
+      if (del) { $('.br-pick', dlg).focus(); const r = rules[+del.dataset.del]; if (r.name === picked) picked = ''; rulesPut(rules.filter(x => x !== r), `Deleted "${r.name}"`).then(() => { if (!rlist.hidden) openRules(); }); return; }
+      const row = e.target.closest('[data-r]'); if (row) { listClose(); useRule(rules[+row.dataset.r]); }
+    });
+    /* recently used: what you renamed with, last 10 per box, newest first */
+    const hGet = k => { const v = store.get('brh.' + k, []); return Array.isArray(v) ? v : []; };
+    const hPush = () => {
+      const keys = st.mode === 'replace' ? ['find', 'repl'] : st.mode === 'add' ? ['addText'] : st.mode === 'number' ? ['pattern'] : [];
+      for (const k of keys) { const v = String(st[k] || ''); if (v) store.set('brh.' + k, [v, ...hGet(k).filter(x => x !== v)].slice(0, 10)); }
+    };
+    const HNAME = { find: 'Find', repl: 'Replace with', addText: 'Text to add', pattern: 'New name' };
+    rulesEl.addEventListener('click', e => {
+      const dd = e.target.closest('.br-dd');
+      if (dd) {
+        e.stopPropagation(); const l = $('.br-hlist', dd.parentNode), k = dd.dataset.h, h = hGet(k);
+        if (!l.hidden) { listClose(); return; }
+        listClose();
+        l.innerHTML = `<div class="h">Used recently in ${HNAME[k]}</div>` + (h.length ? h.map((v, i) => `<div class="r" data-hv="${i}"><span class="m">${esc(v)}</span></div>`).join('') + '<div class="sep"></div><div class="r a" data-hclear>Clear this list</div>'
+          : '<div class="e">Nothing yet - what you rename with is kept here.</div>');
+        l.hidden = false; return;
+      }
+      const hv = e.target.closest('[data-hv]'), hc = e.target.closest('[data-hclear]');
+      if (hv || hc) {
+        e.stopPropagation(); const box = e.target.closest('.br-in'), inp = $('input', box), k = inp.dataset.k;
+        if (hc) store.set('brh.' + k, []);
+        else { inp.value = hGet(k)[+hv.dataset.hv]; st[k] = inp.value; drawRows(); inp.focus(); }
+        listClose();
+      }
+    });
+    $('.dlg-body', dlg).addEventListener('click', e => { if (listsOpen() && !e.target.closest('.br-list')) listClose(); });
+    dlg.extraKey = e => {
+      if (e.key === 'Escape' && listsOpen()) { e.preventDefault(); listClose(); }
+      else if (e.key === 'Escape' && !sbox.hidden) { e.preventDefault(); saveMode(false); }
+      else if (e.key === 'Enter' && e.target === sname) { e.preventDefault(); saveRule(); }
+    };
+    drawPick();
     /* Rename for real: all or nothing on the server, then reload with the new names ticked */
     async function doRename() {
       if (compute() || items.some(it => it.st === 'bad')) return false;
@@ -6105,6 +6428,7 @@
       try { r = await api('batch_rename', { path: bdir, pairs }); }
       catch (e) { toast(e.message, true); drawRows(); return false; }
       const dir = p.path;
+      hPush();
       closeDlg();
       await brReload(p, dir, pairs.map(x => x[1]));
       done(`Renamed ${r.count} item${r.count === 1 ? '' : 's'}`, r.hist);
@@ -6122,6 +6446,32 @@
     drawRows(p); updateChrome(); saveSel();
     const o = panes.find(q => q !== p && q.mode === 'dir' && q.path === dir); if (o) refresh(o);
   }
+  /* the regex cheat sheet in Batch rename: [find, replace with, what it does, example] */
+  const BR_RX_LIST = [
+    ['\\s*\\(\\d{4}\\)', '', 'Remove a year in brackets', 'Heat (1995) → Heat'],
+    ['[._]', ' ', 'Dots and underscores to spaces', 'The.Office_S01 → The Office S01'],
+    ['\\.(1080p|720p|2160p|WEB|BluRay|x264|x265|YIFY).*$', '', 'Cut off release tags and everything after them', 'Pilot.1080p.WEB.YIFY → Pilot'],
+    ['\\s*\\[[^\\]]*\\]', '', 'Remove anything in [square brackets]', 'Movie [1080p] [HDR] → Movie'],
+    ['^\\d+\\s*[-.]\\s*', '', 'Remove a track number at the start', '01 - Song → Song'],
+    ['[!?]', '', 'Remove ! and ?', 'Garcia! → Garcia'],
+    ['^(.+?) - (.+)$', '$2 - $1', 'Swap the two sides of " - "', 'Artist - Title → Title - Artist'],
+    ['s(\\d+)e(\\d+)', 'S$1E$2', 'Season/episode in capitals', 's01e02 → S01E02'],
+    ['\\s{2,}', ' ', 'Squeeze double spaces into one', 'A  B → A B'],
+  ];
+  const BR_RX = `<p>A regex is a pattern that describes text instead of spelling it out. Click <b>Use</b> on one below - it fills in Find and Replace with and ticks <b>Advanced pattern (regex)</b>. The Now → After list shows exactly what it does before anything changes, and <b>Save these settings as…</b> keeps one you like under a plain name.</p>
+    <div class="br-rxl">${BR_RX_LIST.map(([f, r, what, ex], i) => `<div class="br-rxr"><button type="button" class="uc-btn" data-rx="${i}">Use</button><div><b>${esc(what)}</b><div class="muted">${esc(ex)}</div></div><div class="mono">${esc(f)}</div><div class="mono">${r === ' ' ? '<span class="muted">(a space)</span>' : r ? esc(r) : '<span class="muted">(empty)</span>'}</div></div>`).join('')}</div>
+    <h4>The building blocks</h4>
+    <table class="br-hl">
+      <tr><td class="mono">.</td><td>any one character - to mean a real dot, write <span class="mono">\\.</span></td></tr>
+      <tr><td class="mono">\\d &nbsp; \\s &nbsp; \\w</td><td>a digit · a space · a letter, digit or _</td></tr>
+      <tr><td class="mono">*  +  ?</td><td>the thing before it: any number of times · at least once · maybe once</td></tr>
+      <tr><td class="mono">{4} &nbsp; {2,}</td><td>exactly 4 times · 2 or more times</td></tr>
+      <tr><td class="mono">[abc] &nbsp; [^abc]</td><td>one of a, b, c · anything except them</td></tr>
+      <tr><td class="mono">^ &nbsp; $</td><td>the start · the end of the name</td></tr>
+      <tr><td class="mono">a|b</td><td>a or b</td></tr>
+      <tr><td class="mono">( )  then $1 $2</td><td>keep a part, and put it back in Replace with</td></tr>
+      <tr><td class="mono">\\( \\[ \\.</td><td>a backslash makes a special character mean itself</td></tr>
+    </table>`;
   const BR_HELP = {
     replace: `<p>Finds some text in each name and swaps it for something else. Leave "Replace with" empty to simply remove the text.</p>
       <ul><li><span class="mono">Summer Trip_Beach.jpg</span> - find <span class="mono">_</span>, replace with <span class="mono"> - </span> → <span class="mono">Summer Trip - Beach.jpg</span></li>
@@ -6181,6 +6531,25 @@
     perms: ARC_RO, brename: ARC_RO, compress: 'Copy it out of the archive first (F5), then compress it', extract: 'Copy it out of the archive first (F5)', restore: ARC_RO,
     sizes: 'The sizes are shown already - inside an archive every file has its size', find: "Find doesn't look inside archives - go up out of it first", compare: "Compare doesn't work inside archives - copy it out first" };
   /* an archive that needs its password: asked once, kept in memory on the server until the next reboot */
+  /* Link in the other pane: hard links (same disk or pool only, no extra space) or symbolic links */
+  function linkDlg(p, its, q) {
+    const srcs = its.map(t => fullPath(p, t)), one = srcs.length === 1, dirs = its.some(t => itDir(p, t));
+    const what = one ? `<b>${esc(base(srcs[0]))}</b>` : `<b>${srcs.length.toLocaleString()} items</b>`;
+    openDlg(`Link ${one ? esc(base(srcs[0])) : srcs.length.toLocaleString() + ' items'} in the other pane`, `
+      <div class="muted">Makes ${what} appear in <span class="mono">${esc(q.path)}</span> too, without copying anything.</div>
+      <label class="st-radio"><input type="radio" name="lk" value="hard" checked><span><b>Hard link</b><br><span class="muted">The same file in two places, taking its space once. It stays even if the original is deleted. Only on the same disk or pool${dirs ? ' - folders are rebuilt with every file inside linked' : ''}.</span></span></label>
+      <label class="st-radio"><input type="radio" name="lk" value="sym"><span><b>Symbolic link</b><br><span class="muted">A shortcut that points to the original. Works across disks, but breaks if the original is moved or deleted.</span></span></label>
+      <div class="muted">Names already in the other pane are skipped - nothing is replaced. <b>Undo</b> removes the new links; the originals stay as they are.</div>`,
+      [{ label: 'Cancel' }, { label: 'Make links', primary: true, run: async () => {
+        const kind = ($('input[name=lk]:checked', dlg) || {}).value || 'hard';
+        const r = await api('link', { kind, sources: srcs, dest: q.path });
+        const made = r.made.length, bits = [];
+        if (made) bits.push(`${kind === 'hard' ? 'Hard-linked' : 'Linked'} ${made === 1 ? r.made[0] : made.toLocaleString() + ' items'} in ${base(q.path) || q.path}`);
+        if (r.skipped.length) bits.push(`${r.skipped.length === 1 ? r.skipped[0] + ' was' : r.skipped.length + ' were'} already there - skipped`);
+        if (r.failed.length) bits.push(`not linked: ${r.failed.slice(0, 2).join('; ')}${r.failed.length > 2 ? ` (+${r.failed.length - 2} more)` : ''}`);
+        setTimeout(() => { refresh(q, made ? r.made[0] : undefined); if (kind === 'hard') refresh(p); toast(bits.join(' · ') || 'Nothing was linked', !made, r.hist || null); }, 0);
+      } }]);
+  }
   function arcPassword(p, file, path, focusName, why) {
     openDlg(`Password for ${base(file)}`, `<div class="field"><label>Password</label><input type="password" class="arc-pw" autocomplete="off" spellcheck="false"></div>
       <div class="muted">${esc(why && /not right/.test(why) ? 'That password is not right - try again.' : 'This archive is locked with a password.')} It's kept in the server's memory (not on the flash drive) until the next reboot.</div>`,
@@ -9138,14 +9507,14 @@
     ['cursor', 'Cursor row', 'the highlighted row in the active pane'], ['cursor-off', 'Cursor row, other pane', ''], ['sel-count', 'Selection count', '"3 of 120 selected" in the other pane\'s header'],
     ['ok', 'Done', 'finished jobs, success'], ['warn', 'Warning', 'cut items, odd owners'], ['danger', 'Delete', 'delete, errors, tagged items']];
   /* backgrounds, text and lines: only themes that set them (Norton) show them in the editor */
-  const PAL_EXTRA = [['ground', 'Page background', 'behind the panes and bars'], ['surface', 'Panes', 'the file lists and windows'], ['pane-active-bg', 'Active pane', 'the list you are working in'],
+  const PAL_EXTRA = [['ground', 'Page background', 'behind the panes and bars'], ['surface', 'Panes', 'the file lists and windows'], ['pane-active-bg', 'Active pane', 'the list you are working in'], ['frame', 'Active pane frame', 'its outline and header bar - the accent when not set'], ['frame-ink', 'Active pane header text', 'words on that header bar'],
     ['surface-2', 'Bars', 'headers and toolbars'], ['surface-3', 'Buttons', 'buttons and deeper bars'], ['ink', 'Text', 'file names and most text'], ['ink-2', 'Text, softer', 'labels and details'],
     ['muted', 'Text, faint', 'hints and dates'], ['line', 'Lines', 'borders'], ['line-soft', 'Lines, faint', 'row and section dividers'],
     ['cursor-ink', 'Cursor row text', 'the words on the cursor bar'], ['sel-ink', 'Ticked row text', 'the words on ticked rows'],
     ['fk-bg', 'F-key buttons', 'the buttons along the bottom'], ['fk-ink', 'F-key text', 'View, Copy, Delete…'], ['fk-key', 'F-key numbers', 'F2, F5…'], ['fk-line', 'F-key outline', ''], ['fk-danger', 'F-key Delete text', 'the F8 Delete word'],
     ['arc-bg', 'Inside an archive', 'the strip under the pane header'], ['arc-line', 'Inside an archive, outline', 'the strip and the archive in the path bar'], ['input-bg', 'Text boxes', 'text boxes, drop-downs, Go to, the tab name and the path bars'], ['crumb-hover', 'Path bar hover', 'behind a folder name in the path bar'], ['crumb-hover-ink', 'Path bar hover text', 'the folder name you point at'], ['logo-ink', 'Logo', 'the "Commander" in the logo'],
     ['head-ink', 'Headings', 'section titles in Settings, Go to and Keyboard'], ['cols-bg', 'Column titles', 'the NAME / SIZE / DATE row'], ['menu-bg', 'Menu', 'the right-click menu'], ['menu-line', 'Menu outline', '']];
-  const THEMES = {"uncommander": {"name": "unCommander blue", "desc": "the standard look", "light": {"accent": "#008cb4", "accent-soft": "#e0f3f8", "accent-ink": "#ffffff", "cursor": "#fbf3dc", "cursor-off": "#eceef0", "sel-count": "#008cb4", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c"}, "dark": {"accent": "#4c9aff", "accent-soft": "#13233a", "accent-ink": "#07111f", "cursor": "#3b3423", "cursor-off": "#2c3137", "sel-count": "#4c9aff", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a"}}, "unraid": {"name": "unRAID orange", "desc": "unRAID's own orange", "light": {"accent": "#c4510a", "accent-soft": "#fdeee3", "accent-ink": "#ffffff", "cursor": "#fff4e8", "cursor-off": "#efedeb", "sel-count": "#c4510a", "ok": "#2e7a3e", "warn": "#8a6a00", "danger": "#c62828"}, "dark": {"accent": "#ff8c2f", "accent-soft": "#3a2414", "accent-ink": "#1a0c00", "cursor": "#3d2c1c", "cursor-off": "#2d2a27", "sel-count": "#ff8c2f", "ok": "#6cc27e", "warn": "#e8c35a", "danger": "#ff6b5e"}}, "graphite": {"name": "Graphite", "desc": "cool greys, quiet", "light": {"accent": "#3c4450", "accent-soft": "#e8ebef", "accent-ink": "#ffffff", "cursor": "#eef0f3", "cursor-off": "#f4f5f7", "sel-count": "#3c4450", "ok": "#3d7a52", "warn": "#8f6a1c", "danger": "#b4373a"}, "dark": {"accent": "#c5cdd6", "accent-soft": "#2c3138", "accent-ink": "#14171a", "cursor": "#363c44", "cursor-off": "#272b30", "sel-count": "#c5cdd6", "ok": "#7cc596", "warn": "#dcb35c", "danger": "#f07a74"}}, "mono": {"name": "Mono (black & white)", "desc": "pure greyscale, high contrast", "light": {"accent": "#222222", "accent-soft": "#ececec", "accent-ink": "#ffffff", "cursor": "#e4e4e4", "cursor-off": "#f2f2f2", "sel-count": "#222222", "ok": "#4a4a4a", "warn": "#6a6a6a", "danger": "#a32020"}, "dark": {"accent": "#e6e6e6", "accent-soft": "#2e2e2e", "accent-ink": "#111111", "cursor": "#3a3a3a", "cursor-off": "#262626", "sel-count": "#e6e6e6", "ok": "#bdbdbd", "warn": "#a8a8a8", "danger": "#ff7070"}}, "teal": {"name": "Teal", "desc": "calm blue-green", "light": {"accent": "#0381a5", "accent-soft": "#e0f2f7", "accent-ink": "#ffffff", "cursor": "#fbf3dc", "cursor-off": "#edf0f1", "sel-count": "#9b1c1c", "ok": "#2f7d46", "warn": "#946200", "danger": "#b5342c", "arc-bg": "#f7e6f1", "arc-line": "#c25a9c"}, "dark": {"accent": "#3cc4d8", "accent-soft": "#0f2c33", "accent-ink": "#04161a", "cursor": "#3a3424", "cursor-off": "#273034", "sel-count": "#f28b82", "ok": "#5fbe7d", "warn": "#e3b24c", "danger": "#f0736a", "arc-bg": "#3a2234", "arc-line": "#b8609a"}}, "violet": {"name": "Violet", "desc": "soft purple", "light": {"accent": "#6a45d9", "accent-soft": "#efeafd", "accent-ink": "#ffffff", "cursor": "#f7f2ff", "cursor-off": "#efedf3", "sel-count": "#6a45d9", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c"}, "dark": {"accent": "#a98bff", "accent-soft": "#251d3d", "accent-ink": "#140b2b", "cursor": "#2f2840", "cursor-off": "#29262f", "sel-count": "#a98bff", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a"}}, "forest": {"name": "Forest", "desc": "deep green", "light": {"accent": "#1d7a55", "accent-soft": "#e4f4ec", "accent-ink": "#ffffff", "cursor": "#f6f3e4", "cursor-off": "#ecefed", "sel-count": "#1d7a55", "ok": "#1d7a55", "warn": "#8f6a10", "danger": "#b5342c"}, "dark": {"accent": "#4fc995", "accent-soft": "#12291f", "accent-ink": "#04150d", "cursor": "#33331f", "cursor-off": "#262d29", "sel-count": "#4fc995", "ok": "#4fc995", "warn": "#e0ab48", "danger": "#f0736a"}}, "norton": {"name": "Norton", "desc": "an homage", "always": "dark", "light": {"accent": "#33d1d6", "accent-soft": "#1d39aa", "accent-ink": "#04145c", "cursor": "#2cc4c9", "cursor-off": "#2240ae", "sel-count": "#ffff66", "ok": "#66e08a", "warn": "#ffff66", "danger": "#ff8080", "ground": "#08156f", "surface": "#102893", "surface-2": "#0c1f82", "surface-3": "#1a37a8", "line": "#5a6fcc", "line-soft": "#2c45ac", "ink": "#e6e9ff", "ink-2": "#c2c9f5", "muted": "#9aa6e8", "pane-active-bg": "#132c9c", "cursor-ink": "#071470", "sel-ink": "#ffff66", "fk-bg": "#2cc4c9", "fk-ink": "#06123d", "fk-key": "#123a7a", "fk-line": "#2cc4c9", "fk-danger": "#8e0f1c", "input-bg": "#000000", "crumb-hover": "#1a5f66", "logo-ink": "#ffff66", "head-ink": "#ffff66", "cols-bg": "#0d1f6f", "menu-bg": "#08124f", "menu-line": "#000000", "crumb-hover-ink": "#ffffff"}, "dark": {"accent": "#33d1d6", "accent-soft": "#1d39aa", "accent-ink": "#04145c", "cursor": "#2cc4c9", "cursor-off": "#2240ae", "sel-count": "#ffff66", "ok": "#66e08a", "warn": "#ffff66", "danger": "#ff8080", "ground": "#08156f", "surface": "#102893", "surface-2": "#0c1f82", "surface-3": "#1a37a8", "line": "#5a6fcc", "line-soft": "#2c45ac", "ink": "#e6e9ff", "ink-2": "#c2c9f5", "muted": "#9aa6e8", "pane-active-bg": "#132c9c", "cursor-ink": "#071470", "sel-ink": "#ffff66", "fk-bg": "#2cc4c9", "fk-ink": "#06123d", "fk-key": "#123a7a", "fk-line": "#2cc4c9", "fk-danger": "#8e0f1c", "input-bg": "#000000", "crumb-hover": "#1a5f66", "logo-ink": "#ffff66", "head-ink": "#ffff66", "cols-bg": "#0d1f6f", "menu-bg": "#08124f", "menu-line": "#000000", "crumb-hover-ink": "#ffffff"}}};
+  const THEMES = {"uncommander": {"name": "unCommander blue", "desc": "the standard look", "light": {"accent": "#008cb4", "accent-soft": "#e0f3f8", "accent-ink": "#ffffff", "cursor": "#fbf3dc", "cursor-off": "#eceef0", "sel-count": "#008cb4", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c"}, "dark": {"accent": "#4c9aff", "accent-soft": "#13233a", "accent-ink": "#07111f", "cursor": "#3b3423", "cursor-off": "#2c3137", "sel-count": "#4c9aff", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a"}}, "unraid": {"name": "unRAID orange", "desc": "unRAID's own orange", "light": {"accent": "#c4510a", "accent-soft": "#fdeee3", "accent-ink": "#ffffff", "cursor": "#fff4e8", "cursor-off": "#efedeb", "sel-count": "#c4510a", "ok": "#2e7a3e", "warn": "#8a6a00", "danger": "#c62828"}, "dark": {"accent": "#ff8c2f", "accent-soft": "#3a2414", "accent-ink": "#1a0c00", "cursor": "#3d2c1c", "cursor-off": "#2d2a27", "sel-count": "#ff8c2f", "ok": "#6cc27e", "warn": "#e8c35a", "danger": "#ff6b5e"}}, "unraidgrey": {"name": "unRAID orange", "desc": "with a grey frame", "light": {"accent": "#c4510a", "accent-soft": "#fdeee3", "accent-ink": "#ffffff", "cursor": "#fff4e8", "cursor-off": "#efedeb", "sel-count": "#c4510a", "ok": "#2e7a3e", "warn": "#8a6a00", "danger": "#c62828", "frame": "#686d74", "frame-ink": "#ffffff"}, "dark": {"accent": "#ff8c2f", "accent-soft": "#3a2414", "accent-ink": "#1a0c00", "cursor": "#3d2c1c", "cursor-off": "#2d2a27", "sel-count": "#ff8c2f", "ok": "#6cc27e", "warn": "#e8c35a", "danger": "#ff6b5e", "frame": "#555a61", "frame-ink": "#f2f2f2"}}, "graphite": {"name": "Graphite", "desc": "cool greys, quiet", "light": {"accent": "#3c4450", "accent-soft": "#e8ebef", "accent-ink": "#ffffff", "cursor": "#eef0f3", "cursor-off": "#f4f5f7", "sel-count": "#3c4450", "ok": "#3d7a52", "warn": "#8f6a1c", "danger": "#b4373a"}, "dark": {"accent": "#c5cdd6", "accent-soft": "#2c3138", "accent-ink": "#14171a", "cursor": "#363c44", "cursor-off": "#272b30", "sel-count": "#c5cdd6", "ok": "#7cc596", "warn": "#dcb35c", "danger": "#f07a74"}}, "mono": {"name": "Mono (black & white)", "desc": "pure greyscale, high contrast", "light": {"accent": "#222222", "accent-soft": "#ececec", "accent-ink": "#ffffff", "cursor": "#e4e4e4", "cursor-off": "#f2f2f2", "sel-count": "#222222", "ok": "#4a4a4a", "warn": "#6a6a6a", "danger": "#a32020"}, "dark": {"accent": "#e6e6e6", "accent-soft": "#2e2e2e", "accent-ink": "#111111", "cursor": "#3a3a3a", "cursor-off": "#262626", "sel-count": "#e6e6e6", "ok": "#bdbdbd", "warn": "#a8a8a8", "danger": "#ff7070"}}, "teal": {"name": "Teal", "desc": "calm blue-green", "light": {"accent": "#0381a5", "accent-soft": "#e0f2f7", "accent-ink": "#ffffff", "cursor": "#fbf3dc", "cursor-off": "#edf0f1", "sel-count": "#9b1c1c", "ok": "#2f7d46", "warn": "#946200", "danger": "#b5342c", "arc-bg": "#f7e6f1", "arc-line": "#c25a9c"}, "dark": {"accent": "#3cc4d8", "accent-soft": "#0f2c33", "accent-ink": "#04161a", "cursor": "#3a3424", "cursor-off": "#273034", "sel-count": "#f28b82", "ok": "#5fbe7d", "warn": "#e3b24c", "danger": "#f0736a", "arc-bg": "#3a2234", "arc-line": "#b8609a"}}, "mist": {"name": "Mist", "desc": "soft grey, a little steel blue", "light": {"accent": "#46698f", "accent-soft": "#e5ecf4", "accent-ink": "#ffffff", "cursor": "#e7e3f0", "cursor-off": "#f0f1f3", "sel-count": "#b4410f", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c", "arc-bg": "#e8f4ee", "arc-line": "#3f9a6e", "ground": "#f0f1f3", "surface": "#fbfbfc", "surface-2": "#f4f5f7", "surface-3": "#e8eaee", "line": "#d8dce1", "line-soft": "#e6e8ec", "ink": "#22262b", "ink-2": "#454b52", "muted": "#737a83", "cols-bg": "#eceef1", "fk-key": "#46698f"}, "dark": {"accent": "#8fb0d6", "accent-soft": "#1e2a38", "accent-ink": "#0d1622", "cursor": "#2d2a3a", "cursor-off": "#24272c", "sel-count": "#f0905a", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a", "arc-bg": "#1c2f27", "arc-line": "#4fae80", "ground": "#16181b", "surface": "#1d2024", "surface-2": "#22262b", "surface-3": "#2a2e34", "line": "#363b42", "line-soft": "#2b2f35", "ink": "#e6e8eb", "ink-2": "#c3c8ce", "muted": "#8d949c", "cols-bg": "#22262b", "fk-key": "#8fb0d6"}}, "violet": {"name": "Violet", "desc": "soft purple", "light": {"accent": "#6a45d9", "accent-soft": "#efeafd", "accent-ink": "#ffffff", "cursor": "#f7f2ff", "cursor-off": "#efedf3", "sel-count": "#6a45d9", "ok": "#2f7d46", "warn": "#9a6a10", "danger": "#b5342c"}, "dark": {"accent": "#a98bff", "accent-soft": "#251d3d", "accent-ink": "#140b2b", "cursor": "#2f2840", "cursor-off": "#29262f", "sel-count": "#a98bff", "ok": "#5fbe7d", "warn": "#e0ab48", "danger": "#f0736a"}}, "forest": {"name": "Forest", "desc": "deep green", "light": {"accent": "#1d7a55", "accent-soft": "#e4f4ec", "accent-ink": "#ffffff", "cursor": "#f6f3e4", "cursor-off": "#ecefed", "sel-count": "#1d7a55", "ok": "#1d7a55", "warn": "#8f6a10", "danger": "#b5342c"}, "dark": {"accent": "#4fc995", "accent-soft": "#12291f", "accent-ink": "#04150d", "cursor": "#33331f", "cursor-off": "#262d29", "sel-count": "#4fc995", "ok": "#4fc995", "warn": "#e0ab48", "danger": "#f0736a"}}, "norton": {"name": "Norton", "desc": "an homage", "always": "dark", "light": {"accent": "#62c3cb", "accent-soft": "#2f5086", "accent-ink": "#0b1a33", "cursor": "#3e9aa3", "cursor-off": "#2f5086", "sel-count": "#f0d96a", "ok": "#7ed49b", "warn": "#f0d96a", "danger": "#ff8f8f", "ground": "#19294f", "surface": "#23386b", "surface-2": "#1e3064", "surface-3": "#2b4579", "line": "#445c95", "line-soft": "#304982", "ink": "#e3e8f4", "ink-2": "#c0c9df", "muted": "#8f9cc0", "pane-active-bg": "#253c72", "cursor-ink": "#0b1a33", "sel-ink": "#f0d96a", "fk-bg": "#3e9aa3", "fk-ink": "#0b1a33", "fk-key": "#1c4770", "fk-line": "#3e9aa3", "fk-danger": "#8e1a26", "input-bg": "#142040", "crumb-hover": "#25536a", "crumb-hover-ink": "#ffffff", "logo-ink": "#f0d96a", "head-ink": "#f0d96a", "cols-bg": "#1e3064", "menu-bg": "#1a2c57", "menu-line": "#0a1328", "arc-bg": "#2a2a55", "arc-line": "#9d8cf0"}, "dark": {"accent": "#62c3cb", "accent-soft": "#2f5086", "accent-ink": "#0b1a33", "cursor": "#3e9aa3", "cursor-off": "#2f5086", "sel-count": "#f0d96a", "ok": "#7ed49b", "warn": "#f0d96a", "danger": "#ff8f8f", "ground": "#19294f", "surface": "#23386b", "surface-2": "#1e3064", "surface-3": "#2b4579", "line": "#445c95", "line-soft": "#304982", "ink": "#e3e8f4", "ink-2": "#c0c9df", "muted": "#8f9cc0", "pane-active-bg": "#253c72", "cursor-ink": "#0b1a33", "sel-ink": "#f0d96a", "fk-bg": "#3e9aa3", "fk-ink": "#0b1a33", "fk-key": "#1c4770", "fk-line": "#3e9aa3", "fk-danger": "#8e1a26", "input-bg": "#142040", "crumb-hover": "#25536a", "crumb-hover-ink": "#ffffff", "logo-ink": "#f0d96a", "head-ink": "#f0d96a", "cols-bg": "#1e3064", "menu-bg": "#1a2c57", "menu-line": "#0a1328", "arc-bg": "#2a2a55", "arc-line": "#9d8cf0"}}};
   function palTheme(base, mine) {
     if (base && base.startsWith('my:')) { const t = (mine || []).find(x => 'my:' + x.name === base); if (t) return t; }
     return THEMES[base] || THEMES.uncommander;
@@ -9177,7 +9546,7 @@
   async function saveSettings(next) {
     const r = await api('save_settings', { settings: next });
     const treeWas = !!SET.tree;
-    SET = r.settings; applyPalette(SET.palette); applyLook(SET.css); applyToolBtns(); renderBookmarks(); applyPractice(); applySys(false); watchArm(); playerSetting(); plFilesAt = 0;
+    SET = r.settings; PROFILES = Array.isArray(SET.profiles) ? SET.profiles : []; tabShowName(); winDraw(); tabSay({ t: 'prof', list: PROFILES }); applyPalette(SET.palette); applyLook(SET.css); applyToolBtns(); renderBookmarks(); applyPractice(); applySys(false); watchArm(); playerSetting(); plFilesAt = 0;
     if (watchOn()) panes.forEach(p => { if (p.mode === 'dir' && !p.sig) refresh(p); });   // fetch a starting fingerprint
     if (treeWas !== !!SET.tree) panes.forEach(p => { if (p.mode === 'dir') { if (!SET.tree) { p.tree = new Map(); saveTree(p); } applySort(p); } });
     drawClip();
@@ -9397,7 +9766,7 @@
     const SN = w.sonarr || (w.sonarr = {});
     const LD = w.lidarr || (w.lidarr = {});
     let savedOk = false;
-    const tabs = [['gen', 'General'], ['bm', 'Shortcuts'], ['look', 'Look & sound'], ['safe', 'Safety & trash'], ['tools', 'Tools'], ['keys', 'Keyboard']];
+    const tabs = [['gen', 'General'], ['bm', 'Shortcuts'], ['prof', 'Profiles'], ['look', 'Look & sound'], ['safe', 'Safety & trash'], ['tools', 'Tools'], ['keys', 'Keyboard']];
     const sc = (k, label) => `<label class="chk"><input type="checkbox" data-s="${k}" ${w.sounds[k] ? 'checked' : ''}> ${label}</label>`;
     openDlg(only ? 'Tools' : root.dataset.version ? `Settings · version ${root.dataset.version}` : 'Settings', `
       <div class="st-tabs"${only ? ' hidden' : ''}>${tabs.map(([k, l]) => `<button class="st-tab" data-tab="${k}">${l}</button>`).join('')}</div>
@@ -9409,6 +9778,13 @@
         </div>
         <label class="st-radio"><input type="checkbox" class="st-menushow" ${w.menu_show !== false ? 'checked' : ''}><span><b>Show unCommander in unRAID's top menu bar</b><br>
           <span class="muted">Off: no entry in the menu bar - open it from its icon in unRAID's Settings &gt; User Utilities, or in its own tab. Reload the page after saving to see the change.</span></span></label>
+        <div class="st-sub"><b>Clicking unCommander in unRAID's top menu</b></div>
+        <div class="st-newtab">
+          <label class="st-radio"><input type="radio" name="st-newtab" value="" ${!w.menu_newtab ? 'checked' : ''}><span><b>Opens it here</b> <span class="muted">· in this tab, inside unRAID - the usual way</span></span></label>
+          <label class="st-radio"><input type="radio" name="st-newtab" value="unraid" ${w.menu_newtab === 'unraid' ? 'checked' : ''}><span><b>Opens a new tab, with unRAID's menu</b> <span class="muted">· unCommander inside unRAID, in a tab of its own</span></span></label>
+          <label class="st-radio"><input type="radio" name="st-newtab" value="solo" ${w.menu_newtab === 'solo' ? 'checked' : ''}><span><b>Opens a new tab, without unRAID's menu</b> <span class="muted">· the whole window for unCommander</span></span></label>
+          <div class="muted">With a new tab, the unRAID page stays where it was, and clicking again goes back to that tab. Reload the unRAID page after saving.</div>
+        </div>
         <div class="field"><label>Name in the unRAID menu bar</label>
           <input type="text" class="st-menu" maxlength="30" value="${esc(w.menu_name || 'unCommander')}" placeholder="unCommander"></div>
         <div class="muted">The label of unCommander's entry in the unRAID top menu. Reload the page after saving to see it there. Leave it empty to go back to "unCommander".</div>
@@ -9447,7 +9823,7 @@
         <label class="st-radio"><input type="checkbox" class="st-player" ${w.player !== false ? 'checked' : ''}><span><b>Music player</b><br>
           <span class="muted">A player at the bottom of unCommander that plays one playlist: right-click songs, albums or artists and pick <b>Play</b> or <b>Add to playlist</b>, or open a playlist file. The ♪ button at the top shows and hides it. Off: no player and no playlist editor - songs still preview with F2 or a double-click.</span></span></label>
         <div class="field"><label>Playlist folders</label>
-          <textarea class="st-pldirs" rows="3" spellcheck="false" placeholder="/mnt/user/Media/Music/Playlists">${esc((w.pldirs || []).join('\n'))}</textarea></div>
+          <textarea class="st-pldirs" rows="3" spellcheck="false" placeholder="Enter path here…">${esc((w.pldirs || []).join('\n'))}</textarea></div>
         <div class="muted">One folder per line. The playlists in them are listed in the player and in the editor's Open… list, and Save as starts in the first one.</div>
       </div>
 
@@ -9516,6 +9892,11 @@
         <div class="muted">Buttons in the bar under the top row. Tap one to open that folder in the active pane.</div>
         <div class="st-bms"></div>
         <div class="st-row"><button class="uc-btn st-add-cur">＋ Add the active pane's folder</button><button class="uc-btn st-add-blank">＋ Add blank</button></div>
+      </div>
+
+      <div class="st-panel" data-panel="prof">
+        <div class="muted">A profile is a layout you come back to: both panes' folders, the active pane, the sort, hidden files, each pane's columns, list or Gallery, open tree folders, ticks, the filter, the music view and the player. To make one, set the panes up as you want them, click the box next to the <b>New tab</b> button, and choose <b>Save what's open now as a new profile</b>. Change one the same way: open it, change the panes, then <b>Update</b> from that box. Here you can rename, reorder and remove them. They're kept on the server, so every browser has them.</div>
+        <div class="st-profs"></div>
       </div>
 
       <div class="st-panel" data-panel="size">
@@ -9598,7 +9979,8 @@
       <div class="st-panel" data-panel="about">
         <img class="st-logo" src="/plugins/uncommander/images/logo.png" alt="unCommander - two-pane file manager for unRAID">
         <div class="st-about">unCommander${root.dataset.version ? ` <span class="mono">${esc(root.dataset.version)}</span>` : ''} - source code, the full user guide, and a place to report bugs or ask for features:
-          <a href="https://github.com/hernandito/unCommander" target="_blank" rel="noopener">github.com/hernandito/unCommander ↗</a></div>
+          <a href="https://github.com/hernandito/unCommander" target="_blank" rel="noopener">github.com/hernandito/unCommander ↗</a>
+          <div class="st-guide"><a href="https://github.com/hernandito/unCommander/blob/main/docs/USER-GUIDE.md" target="_blank" rel="noopener">📖 User guide ↗</a> <span class="muted">- every feature, step by step</span></div></div>
         <a class="st-bmc" href="https://www.buymeacoffee.com/hernandito" target="_blank" rel="noopener" title="Like unCommander? Buy the author a coffee">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path class="cup" d="M4.5 8.5h12.2l-1.3 10.2a2 2 0 0 1-2 1.8H7.8a2 2 0 0 1-2-1.8z"/><path class="rim" d="M3.6 6.3h14v2.2h-14z"/><path class="steam" d="M8.6 4.6c0-1 .9-1.1.9-2.1M11.6 4.6c0-1 .9-1.1.9-2.1"/><path class="handle" d="M16.6 10.3h1.6a2.2 2.2 0 0 1 0 4.4h-2.1"/></svg>
           Buy me a coffee</a>
@@ -9742,6 +10124,7 @@
         w.player = $('.st-player', dlg).checked;
         w.pldirs = $('.st-pldirs', dlg).value.split('\n').map(x => x.trim().replace(/\/+$/, '')).filter(Boolean);
         w.menu_show = $('.st-menushow', dlg).checked;
+        w.menu_newtab = ($('input[name=st-newtab]:checked', dlg) || {}).value || '';
         store.set('ctxOff', !$('.st-ctxmenu', dlg).checked);
         store.set('rtick', $('.st-rtick', dlg).checked);
         store.set('typeMode', ($('input[name=st-type]:checked', dlg) || {}).value === 'filter' ? 'filter' : 'jump');
@@ -9765,7 +10148,12 @@
         w.lidarr = rdRead($('.rd-box[data-app="lidarr"]', dlg));
         const oldMenu = SET.menu_name;
         w.menu_name = $('.st-menu', dlg).value.trim();
+        /* profiles: an empty name keeps the old one, two the same get a number; tabs showing a renamed one follow it */
+        const ren = {}, taken = new Set();
+        w.profiles.forEach(x => { let n = (x.name || '').trim().replace(/\s+/g, ' ').slice(0, 40) || x.was || 'Profile', k = 2; const b0 = n;
+          while (taken.has(n.toLowerCase())) n = `${b0.slice(0, 36)} ${k++}`; taken.add(n.toLowerCase()); x.name = n; if (x.was && x.was !== n) ren[x.was] = n; delete x.was; });
         savedOk = true; await saveSettings(w);
+        if (Object.keys(ren).length) profRenamed(ren);
         toast(SET.menu_name !== oldMenu ? 'Saved — reload the page to see the new menu name' : quiet ? 'Tools settings saved' : 'Settings saved');
     }
     document.activeElement && document.activeElement.blur();
@@ -9778,7 +10166,7 @@
     $('.fs-reset', dlg).addEventListener('click', () => fsSet(100));
 
     /* Four tabs, each grouping related sections under a small heading. */
-    const GROUP = { colors: 'look', music: 'gen', gen: 'gen', tree: 'gen', video: 'gen', touch: 'gen', jobs: 'gen', watch: 'gen', about: 'gen', bm: 'bm', size: 'look', look: 'look', hl: 'look', snd: 'look', safe: 'safe', sys: 'safe', trash: 'safe', tools: 'tools', keys: 'keys' };
+    const GROUP = { colors: 'look', music: 'gen', gen: 'gen', tree: 'gen', video: 'gen', touch: 'gen', jobs: 'gen', watch: 'gen', about: 'gen', bm: 'bm', prof: 'prof', size: 'look', look: 'look', hl: 'look', snd: 'look', safe: 'safe', sys: 'safe', trash: 'safe', tools: 'tools', keys: 'keys' };
     $$('.rd-box[data-app]', dlg).forEach(box => rdWire(box, w));
     /* Function keys: a preset fills the boxes; changing a box makes it "My own" */
     $$('input[name=st-fkp]', dlg).forEach(r => r.addEventListener('change', () => { const pr = FK_PRESETS[r.value]; if (pr) $$('select[data-fk]', dlg).forEach(x => { x.value = pr[2][x.dataset.fk] || ''; }); }));
@@ -9842,8 +10230,8 @@
         if (!vb.dataset.done && r.state === 'ready') {
           vb.dataset.done = '1';
           const lab = { cpu: 'the CPU', nvidia: 'the NVIDIA graphics', vaapi: 'the Intel/AMD graphics' };
-          const cur = w.vconv || 'auto', ch = [['auto', 'Automatic', 'the graphics when they work, else the CPU - recommended'], ['off', 'Off', "videos the browser can't show won't play"], ['cpu', 'Use the CPU', 'works everywhere; heavy']].concat((r.gpus || []).map(gp => [gp.id, `Use the ${gp.label}`, gp.id === 'nvidia' ? 'needs the Nvidia Driver plugin' : '']));
-          vb.innerHTML = ch.map(([v, l, d]) => `<label class="st-radio st-vc"><input type="radio" name="st-vconv" value="${v}" ${cur === v ? 'checked' : ''}><span><b>${esc(l)}</b>${d ? ` <span class="muted">· ${esc(d)}</span>` : ''}${v !== 'off' ? ` <button type="button" class="uc-btn st-vtest" data-m="${v}">Test</button> <span class="st-vres">${v === 'auto' && r.vauto ? `<span class="st-ok">✓ using ${lab[r.vauto]}</span>` : ''}</span>` : ''}</span></label>`).join('')
+          const cur = w.vconv || 'auto', ch = [['auto', 'Automatic', 'the graphics when they work, else the CPU - recommended'], ['off', 'Off', "videos the browser can't show won't play"], ['cpu', 'Use the CPU', 'works everywhere; heavy']].concat((r.gpus || []).map(gp => [gp.id, `Use the ${gp.label}`, gp.id === 'nvidia' ? 'needs the Nvidia Driver plugin' : '', gp.nolib]));
+          vb.innerHTML = ch.map(([v, l, d, nolib]) => nolib ? `<label class="st-radio st-vc st-vc-no"><input type="radio" name="st-vconv" value="${v}" disabled><span><b>${esc(l)}</b> <span class="muted">· not available</span><br><span class="st-vc-why">This server has ${esc(l.replace(/^Use the /, ''))}, but unRAID doesn't include the VA-API video drivers it needs, so it can't convert video here. ${cur === v ? '<b>Videos use the CPU instead</b> - pick Use the CPU or Automatic to stop seeing this.' : 'Use the CPU or Automatic instead.'}</span></span></label>` : `<label class="st-radio st-vc"><input type="radio" name="st-vconv" value="${v}" ${cur === v ? 'checked' : ''}><span><b>${esc(l)}</b>${d ? ` <span class="muted">· ${esc(d)}</span>` : ''}${v !== 'off' ? ` <button type="button" class="uc-btn st-vtest" data-m="${v}">Test</button> <span class="st-vres">${v === 'auto' && r.vauto ? `<span class="st-ok">✓ using ${lab[r.vauto]}</span>` : ''}</span>` : ''}</span></label>`).join('')
             + ((r.gpus || []).length ? '' : '<div class="muted">No NVIDIA, Intel or AMD graphics were found on this server - Automatic uses the CPU.</div>');
           vb.addEventListener('click', async e => {
             const b = e.target.closest('.st-vtest'); if (!b) return; e.preventDefault();
@@ -9917,6 +10305,29 @@
     });
     $('.st-add-blank', dlg).addEventListener('click', () => { w.bookmarks.push({ label: '', path: '' }); drawBms(); $('.st-bm:last-child .st-label', list).focus(); });
 
+    /* profiles: rename, reorder, remove (they're made and updated from the box by the New tab button) */
+    if (!Array.isArray(w.profiles)) w.profiles = [];
+    w.profiles.forEach(x => { x.was = x.name; });
+    const plist = $('.st-profs', dlg);
+    const drawProfs = () => {
+      plist.innerHTML = w.profiles.length ? w.profiles.map((x, i) => `
+        <div class="st-prof" data-i="${i}">
+          <input type="text" class="st-pname" value="${esc(x.name)}" placeholder="Name" maxlength="40" spellcheck="false">
+          <span class="st-psub" title="${esc(x.panes.map(q => q.path).join('  ⇄  '))}">${esc(profSub(x))}</span>
+          <button class="uc-btn" data-mv="-1" title="Move up" ${i ? '' : 'disabled'}>🠉</button>
+          <button class="uc-btn" data-mv="1" title="Move down" ${i < w.profiles.length - 1 ? '' : 'disabled'}>🠋</button>
+          <button class="uc-btn danger" data-del title="Remove">✕</button>
+        </div>`).join('') : '<div class="uc-empty">No profiles yet.</div>';
+    };
+    drawProfs();
+    plist.addEventListener('input', e => { const row = e.target.closest('.st-prof'); if (row && e.target.matches('.st-pname')) w.profiles[+row.dataset.i].name = e.target.value; });
+    plist.addEventListener('click', e => {
+      const row = e.target.closest('.st-prof'); if (!row) return;
+      const i = +row.dataset.i, mv = e.target.closest('[data-mv]');
+      if (mv) { const j = i + +mv.dataset.mv; [w.profiles[i], w.profiles[j]] = [w.profiles[j], w.profiles[i]]; drawProfs(); }
+      if (e.target.closest('[data-del]')) { w.profiles.splice(i, 1); drawProfs(); }
+    });
+
     /* appearance */
     const ta = $('.st-css', dlg);
     ta.addEventListener('input', () => { w.css = ta.value; applyLook(w.css); });
@@ -9980,7 +10391,7 @@
   }
   function tabForget(id) {
     if (id === 'main') return;
-    for (const k of [...TAB_KEYS, 'tabname']) { try { localStorage.removeItem(tabKey(k, id)); } catch (e) {} }
+    for (const k of [...TAB_KEYS, 'tabname', 'profile', 'profgo']) { try { localStorage.removeItem(tabKey(k, id)); } catch (e) {} }
   }
   /* closed tabs are kept a week (Reopen closed tab), at most 12 */
   function tabPrune() {
@@ -9999,22 +10410,31 @@
     if (!extra || !('closed' in extra)) delete r[TAB].closed;
     tabRegSet(r);
   }
-  /* the name: what you called it, else the active pane's folder (for the browser's tab and Reopen) */
+  /* the name: the profile it shows, else what you called it, else the active pane's folder (for the browser's tab and Reopen) */
+  const tabProf = () => { const n = store.get('profile', ''); return n && PROFILES.some(x => x.name === n) ? n : ''; };
   function tabName() {
-    const own = store.get('tabname', '');
+    const own = tabProf() || store.get('tabname', '');
     if (own) return own;
     const p = A(); return (p && p.mode === 'dir' ? base(p.path) || '/' : '') || 'unCommander';
   }
   const tabEl = $('.uc-tabname'), tabBtn = $('.uc-tabbtn');
   const tabsAlive = new Map();             // the other unCommander tabs open in this browser: id -> last heard
-  /* the box next to the New tab button shows the name you gave this tab (or "tab name…");
-   * the browser's tab shows that name, else the active folder - kept up to date as you move */
+  /* the box next to the New tab button: the profile this tab shows (a dot when it has changed
+   * since), else the name you gave the tab, else the active folder. Click it for the profiles.
+   * The browser's tab shows the same - kept up to date as you move */
+  let tabElWas = '';
   function tabShowName() {
-    const own = store.get('tabname', '');
-    if (tabEl) { tabEl.textContent = own || 'tab name…'; tabEl.classList.toggle('empty', !own); tabEl.title = own ? `This tab: ${own} - click to rename it` : 'Give this tab a name'; }
-    const t = own || `uC · ${tabName()}`;
+    const prof = tabProf(), own = prof || store.get('tabname', ''), n = tabName();
+    if (tabEl) {
+      const drift = !!prof && profChanged();
+      const html = `<span class="tn-t">${esc(n)}</span>${drift ? '<span class="tn-dot" aria-label="changed"></span>' : ''}<span class="tn-v" aria-hidden="true">▾</span>`;
+      if (html !== tabElWas) { tabElWas = html; tabEl.innerHTML = html; if (!booting) fitBar(); }
+      tabEl.classList.toggle('auto', !own); tabEl.classList.toggle('prof', !!prof);
+      tabEl.title = prof ? `Profile: ${prof}${drift ? ' - changed since it was saved' : ''}. Click for profiles` : 'Profiles, and this tab\'s name';
+    }
+    const t = own || `uC · ${n}`;
     if (document.title !== t) document.title = t;
-    if (winTabs && winStrip) { const on = $('.wt.on .wt-n', winStrip), n = own || tabName(); if (on && on.textContent !== n) winDraw(); }
+    if (winTabs && winStrip) { const on = $('.wt.on .wt-n', winStrip); if (on && on.textContent !== n) winDraw(); }
   }
   let tabCh = null;
   try { tabCh = new BroadcastChannel('uncommander'); } catch (e) {}
@@ -10035,6 +10455,8 @@
       tabTouch(); tabShowName();
     }
     if (m.t === 'bye') { tabsAlive.delete(m.from); tabShowName(); }
+    /* profiles saved or changed in another tab */
+    if (m.t === 'prof' && m.from !== TAB && Array.isArray(m.list)) { PROFILES = m.list; SET.profiles = PROFILES; tabShowName(); winDraw(); }
     /* someone pressed play in another tab: this one goes quiet */
     if (m.t === 'play' && m.from !== TAB) $$('audio, video').forEach(a => { if (!a.paused) a.pause(); });
   };
@@ -10059,10 +10481,11 @@
   });
   /* open a new browser tab or a small window, where this one is */
   /* a new tab's layout (a copy of this one's) and its address */
-  function tabPrep(kind) {
+  function tabPrep(kind, prof) {
     const id = tabNew();
     tabCopy(TAB, id);
     try { localStorage.removeItem(tabKey('tabname', id)); } catch (e) {}
+    profPrime(id, prof);
     const r = tabReg(); r[id] = { seen: Date.now(), kind }; tabRegSet(r);
     const withUnraid = store.get('tabshow', 'solo') === 'unraid';
     return { id, url: withUnraid ? `/UnCommander?uctab=${id}` : `/plugins/uncommander/uncommander.php?uctab=${id}` };
@@ -10078,7 +10501,7 @@
   }
   function tabRename() {
     openDlg('Name this tab', `<div class="field"><label>Name</label><input type="text" class="tn-in" value="${esc(store.get('tabname', ''))}" placeholder="tab name…" spellcheck="false" maxlength="40"></div>
-      <div class="muted">Shown next to the New tab button and on the browser's tab. Empty: no name - the browser's tab shows the active folder.</div>`,
+      <div class="muted">Shown in the box next to the New tab button and on the browser's tab, when the tab isn't showing a profile. Empty: no name - they show the active folder.</div>`,
       [{ label: 'Cancel' }, { label: 'Save', primary: true, run: () => { store.set('tabname', $('.tn-in', dlg).value.trim()); tabTouch(); tabShowName(); winDraw(); } }]);
   }
 
@@ -10094,7 +10517,7 @@
   let winTabs = IN_WIN ? winGet() : null;
   if (winTabs) { if (!winTabs.tabs.includes(TAB)) winTabs.tabs.push(TAB); winTabs.cur = TAB; winSet(winTabs); }
   let winStrip = null, winBusy = false;
-  const winLabel = id => { try { const own = JSON.parse(localStorage.getItem(tabKey('tabname', id)) || '""'); if (own) return [own, true]; const p = JSON.parse(localStorage.getItem(tabKey('active', id)) || '0'); const path = JSON.parse(localStorage.getItem(tabKey('path' + (p ? 1 : 0), id)) || '""'); return [base(path) || '/', false]; } catch (e) { return ['unCommander', false]; } };
+  const winLabel = id => { try { const pf = JSON.parse(localStorage.getItem(tabKey('profile', id)) || '""'), own = (pf && PROFILES.some(x => x.name === pf) ? pf : '') || JSON.parse(localStorage.getItem(tabKey('tabname', id)) || '""'); if (own) return [own, true]; const p = JSON.parse(localStorage.getItem(tabKey('active', id)) || '0'); const path = JSON.parse(localStorage.getItem(tabKey('path' + (p ? 1 : 0), id)) || '""'); return [base(path) || '/', false]; } catch (e) { return ['unCommander', false]; } };
   function winDraw() {
     if (!winTabs) return;
     if (!winStrip) {
@@ -10104,9 +10527,16 @@
         if (e.target.closest('.wt-add')) return winAdd();
         const t = e.target.closest('[data-wt]'); if (t && t.dataset.wt !== TAB) winSwitch(t.dataset.wt);
       });
+      /* right-click the +: a new tab with one of the profiles */
+      winStrip.addEventListener('contextmenu', e => {
+        const a = e.target.closest('.wt-add'); if (!a) return;
+        e.preventDefault(); const b = a.getBoundingClientRect();
+        showMenu(b.left, b.bottom + 4, 'New tab with a profile', PROFILES.length ? PROFILES.map(x => ({ label: x.name, ic: 'pane', sub: profSub(x), run: () => winAdd(x.name) }))
+          : [{ label: 'No profiles yet - save one from the box next to the New tab button', off: true }]);
+      });
       winStrip.addEventListener('dblclick', e => { const t = e.target.closest('[data-wt]'); if (t && t.dataset.wt === TAB) tabRename(); });
     }
-    winStrip.innerHTML = winTabs.tabs.map(id => { const [n, own] = id === TAB ? [store.get('tabname', '') || tabName(), !!store.get('tabname', '')] : winLabel(id); return `<div class="wt${id === TAB ? ' on' : ''}${own ? '' : ' auto'}" data-wt="${esc(id)}" title="${id === TAB ? 'This tab - double-click to name it' : 'Switch to this tab'}"><span class="wt-n">${esc(n)}</span>${winTabs.tabs.length > 1 ? `<button type="button" class="wt-x" data-wx="${esc(id)}" title="Close this tab" aria-label="Close">✕</button>` : ''}</div>`; }).join('')
+    winStrip.innerHTML = winTabs.tabs.map(id => { const [n, own] = id === TAB ? [tabName(), !!(tabProf() || store.get('tabname', ''))] : winLabel(id); return `<div class="wt${id === TAB ? ' on' : ''}${own ? '' : ' auto'}" data-wt="${esc(id)}" title="${id === TAB ? 'This tab - double-click to name it' : 'Switch to this tab'}"><span class="wt-n">${esc(n)}</span>${winTabs.tabs.length > 1 ? `<button type="button" class="wt-x" data-wx="${esc(id)}" title="Close this tab" aria-label="Close">✕</button>` : ''}</div>`; }).join('')
       + '<button type="button" class="wt-add" title="New tab, where you are now" aria-label="New tab">+</button>';
   }
   /* this tab's saved layout, put into the panes */
@@ -10132,17 +10562,19 @@
       winTabs.cur = id; winSet(winTabs); winDraw();
       tabTouch(); tabShowName();
       await winOpenLayout();
+      await profGo();
     } finally { winBusy = false; winDraw(); }
   }
-  function winAdd() {
+  function winAdd(prof) {
     const id = tabNew(); tabCopy(TAB, id);
     try { localStorage.removeItem(tabKey('tabname', id)); } catch (e) {}
+    profPrime(id, prof);
     winTabs.tabs.splice(winTabs.tabs.indexOf(TAB) + 1, 0, id); winSet(winTabs);
     winSwitch(id);
   }
   function winClose(id) {
     const i = winTabs.tabs.indexOf(id); if (i < 0 || winTabs.tabs.length < 2) return;
-    const name = (id === TAB ? [store.get('tabname', '') || tabName()] : winLabel(id))[0];
+    const name = (id === TAB ? [tabName()] : winLabel(id))[0];
     winTabs.tabs.splice(i, 1); winSet(winTabs);
     const undo = async () => {
       if (!winTabs.tabs.includes(id)) { winTabs.tabs.splice(Math.min(i, winTabs.tabs.length), 0, id); winSet(winTabs); }
@@ -10154,6 +10586,140 @@
   }
   if (winTabs) { root.classList.add('uc-inwin'); winDraw(); }
 
+  /* ---------- profiles ----------
+   * A profile is a named layout: both panes' folders, which pane is active, the sort, hidden
+   * files, each pane's columns, list or Gallery, and the filter. You make one by setting the
+   * panes up as you want them and saving from the box next to the New tab button; it's kept
+   * on the server (settings.json), so every browser and device has the same ones. Loading one
+   * puts it in this tab; New tab, New window and the tab row's + can start with one.
+   * It also keeps the open tree folders, the ticks and the cursor. History and the music queue aren't part of it. */
+  const profFind = n => PROFILES.find(x => x.name === n) || null;
+  const profCols = c => { const o = {}; for (const [k] of COLS) o[k] = colWanted(c || {}, k); return o; };
+  function profNow(name) {
+    return { name, active, sort: sortKey, rev: !!sortRev, hidden: !!showHidden,
+      /* the music library view, and the player (shown, and pinned to the side) */
+      mus: mus && !mus.pair ? mus.root : '', bp: playerOn() && !!store.get('bpshow', false), pin: isPinned(),
+      panes: panes.map(p => {
+        const dir = p.mode === 'dir' && !!p.path, cur = dir && p.items[p.cursor];
+        return { path: dir ? p.path : store.get('path' + p.i, p.i ? '/mnt' : '/mnt/user'),
+          gal: !!p.gal, cols: profCols(store.get('cols' + p.i, {})), flt: filterMode() && dir ? p.flt || '' : '',
+          tree: dir && SET.tree ? [...(p.tree || new Map()).keys()].slice(0, 200) : [],
+          sel: dir ? [...p.sel].map(i => p.items[i]).filter(it => it && !it.up).map(it => it.abs || it.n).slice(0, 500) : [],
+          cur: cur && !cur.up ? cur.abs || cur.n : '' };
+      }) };
+  }
+  /* what counts as "changed since it was saved" (the dot): the layout - not the ticks or where the cursor is */
+  const profKey = x => JSON.stringify([x.active ? 1 : 0, x.sort, !!x.rev, !!x.hidden, x.mus || '', !!x.bp, !!x.bp && !!x.pin, x.panes.map(q => [q.path, !!q.gal, COLS.map(([k]) => !!profCols(q.cols)[k]), q.flt || '', [...(q.tree || [])].sort()])]);
+  function profChanged() {
+    const x = profFind(store.get('profile', '')); if (!x || booting || (mus && mus.busy)) return false;
+    try { return profKey(x) !== profKey(profNow(x.name)); } catch (e) { return false; }
+  }
+  const profSub = x => x.panes.map(q => base(q.path) || q.path).join(' ⇄ ');
+  async function profSave(list, done) {
+    let r; try { r = await api('profiles_set', { profiles: JSON.stringify(list) }); } catch (e) { toast(e.message, true); return false; }
+    PROFILES = r.profiles || []; SET.profiles = PROFILES;
+    tabSay({ t: 'prof', list: PROFILES });
+    tabShowName(); winDraw(); if (done) toast(done);
+    return true;
+  }
+  /* a new tab that starts with a profile: its folders now, the rest once it has opened */
+  function profPrime(id, name) {
+    const x = name && profFind(name); if (!x) return;
+    const put = (k, v) => { try { localStorage.setItem(tabKey(k, id), JSON.stringify(v)); } catch (e) {} };
+    x.panes.forEach((q, i) => { put('path' + i, q.path); put('gal' + i, false); put('trail' + i, ''); put('sel' + i, null); put('tree' + i, null); });
+    put('active', x.active ? 1 : 0); put('mus', null); put('profgo', x.name); put('profile', x.name);
+  }
+  async function profGo() {
+    const n = store.get('profgo', ''); if (!n) return;
+    store.set('profgo', ''); await profApply(n, true);
+  }
+  async function profApply(name, quiet) {
+    const x = profFind(name); if (!x) { if (!quiet) toast(`There's no profile called ${name} any more`, true); return; }
+    if (mus) musExit();
+    panes.forEach(q => { if (q.gal) galSet(q, false); });
+    if (cmpOn) endCompare(true);
+    sortKey = x.sort || 'name'; sortRev = !!x.rev; saveSort();
+    showHidden = !!x.hidden; store.set('hidden', showHidden); hid.checked = showHidden;
+    x.panes.forEach((q, i) => store.set('cols' + i, profCols(q.cols)));
+    panes.forEach(p => applyCols(p));
+    await Promise.all(panes.map((p, i) => load(p, x.panes[i].path)));
+    const gone = panes.filter(p => p.error).map(p => x.panes[p.i].path);
+    /* then each pane's open tree folders (a folder that's gone is left out, the others show what they hold now),
+     * the filter, the ticks and the cursor */
+    for (const p of panes) {
+      const q = x.panes[p.i]; if (p.mode !== 'dir' || p.error) continue;
+      const tr = SET.tree && !p.root ? (q.tree || []).filter(t => t.startsWith(p.path === '/' ? '/' : p.path + '/')) : [];
+      p.tree = new Map(); if (tr.length) await treeFetch(p, tr.slice(0, 200));
+      saveTree(p);
+      p.flt = filterMode() ? q.flt || '' : '';
+      await applySort(p);
+      p.sel.clear(); const want = new Set(q.sel || []);
+      if (want.size) p.items.forEach((it, k) => { if (!it.up && want.has(it.abs || it.n)) p.sel.add(k); });
+      const ix = q.cur ? p.items.findIndex(it => (it.abs || it.n) === q.cur) : -1;
+      if (ix >= 0) moveCursor(p, ix, true);
+      drawRows(p); updateSelInfo(p);
+    }
+    saveSel();
+    /* the music library view, when both panes are still in the library */
+    const [L, Rt] = panes;
+    if (x.mus && L.mode === 'dir' && L.path === x.mus && Rt.mode === 'dir' && inDir(Rt.path, x.mus)) {
+      mus = { root: x.mus, busy: false, q: [], i: -1, now: null }; root.classList.add('uc-mus'); store.set('mus', x.mus); store.set('musroot', x.mus);
+      panes.forEach(q => { q.galItems = null; draw(q); }); await musSync();
+    }
+    /* the player: a profile saved with it showing brings it back (one saved without it leaves it as it is) */
+    if (x.bp && playerOn()) { if (isPinned() !== !!x.pin) npPin(!!x.pin); if (!store.get('bpshow', false)) bpShow(true, false); }
+    setActive(x.active ? 1 : 0);
+    if (filterMode()) { jumpBox.value = A().flt || ''; jumpBox.classList.toggle('filtering', !!A().flt); }
+    const g = x.panes.findIndex(q => q.gal); if (!mus && g >= 0 && panes[g].mode === 'dir' && !panes[g].root) galSet(panes[g], true);
+    store.set('profile', x.name); tabTouch(); tabShowName(); winDraw();
+    if (gone.length) toast(`${x.name}: ${gone.join(' and ')} isn't there any more`, true);
+    else if (!quiet) toast(`Loaded ${x.name}`);
+  }
+  function profSaveDlg() {
+    const cur = tabProf();
+    openDlg('Save as a new profile', `<div class="field"><label>Name</label><input type="text" class="pf-in" value="" placeholder="e.g. Movies sorting" spellcheck="false" maxlength="40"><div class="pf-note" hidden></div></div>
+      <div class="muted">Saves what this tab shows now: <b>${esc(profSub(profNow('')))}</b>, the active pane, the sort, hidden files, each pane's columns, list or Gallery, open tree folders, ticks${filterMode() ? ', the filter' : ''}${mus ? ', the music view' : ''}${playerOn() && store.get('bpshow', false) ? ', the player' : ''}. Your profiles are kept on the server, so every browser has them.</div>`,
+      [{ label: 'Cancel' }, { label: 'Save', primary: true, run: () => {
+        const n = $('.pf-in', dlg).value.trim().replace(/\s+/g, ' ');
+        if (!n) { toast('Give the profile a name', true); return false; }
+        const same = PROFILES.find(x => x.name.toLowerCase() === n.toLowerCase());
+        /* the same name as one you have: that one is replaced (in its place in the list) */
+        const list = PROFILES.filter(x => x !== same); list.splice(same ? PROFILES.indexOf(same) : list.length, 0, profNow(n));
+        store.set('profile', n);
+        profSave(list, same ? `Replaced ${same.name}` : `Saved ${n}`).then(ok => { if (!ok) store.set('profile', cur); });
+      } }]);
+    const i = $('.pf-in', dlg), note = $('.pf-note', dlg);
+    i.addEventListener('input', () => { const v = i.value.trim().toLowerCase(), same = v && PROFILES.find(x => x.name.toLowerCase() === v); note.hidden = !same; if (same) note.textContent = `This replaces your profile ${same.name} (${profSub(same)}).`; });
+  }
+  /* profiles renamed in Settings: every tab in this browser showing one keeps showing it */
+  function profRenamed(ren) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i); if (!k || !(k === 'uc.profile' || /^uc\.t\.[^.]+\.profile$/.test(k))) continue;
+        const v = JSON.parse(localStorage.getItem(k) || '""'); if (v && ren[v]) localStorage.setItem(k, JSON.stringify(ren[v]));
+      }
+    } catch (e) {}
+    tabShowName(); winDraw();
+  }
+  function profUpdate() {
+    const n = tabProf(); if (!n) return;
+    profSave(PROFILES.map(x => x.name === n ? profNow(n) : x), `Updated ${n}`);
+  }
+  function profMenu() {
+    const cur = tabProf(), b = (tabEl || $('.uc-tabcombo')).getBoundingClientRect(), changed = !!cur && profChanged();
+    showMenu(b.left, b.bottom + 4, PROFILES.length ? 'Load a profile into this tab' : 'Profiles', [
+      ...(PROFILES.length ? PROFILES.map(x => ({ label: x.name, ic: x.name === cur ? 'check' : 'pane', sub: profSub(x), hl: x.name === cur, run: () => profApply(x.name) }))
+        : [{ label: 'No profiles yet - set the panes up, then save them below', off: true }]),
+      '-',
+      cur ? { label: `Update "${cur}"`, sub: 'with what\'s open now - ticks included', ic: 'refresh', run: profUpdate } : null,
+      { label: 'Save what\'s open now as a new profile…', ic: 'plus', run: profSaveDlg },
+      cur ? { label: 'Stop showing a profile in this tab', ic: 'x', run: () => { store.set('profile', ''); tabTouch(); tabShowName(); winDraw(); } } : null,
+      '-',
+      { label: 'Rename this tab…', ic: 'rename', run: tabRename },
+      { label: 'Manage profiles…', ic: 'edit', run: () => openSettings('prof') },
+    ]);
+  }
+
   /* ---------- the New tab panel ---------- */
   let tabPop = null;
   function tabPanel() {
@@ -10164,28 +10730,29 @@
       tabPop.addEventListener('keydown', e => { if (e.key === 'Escape') { tabPop.hidden = true; root.focus({ preventScroll: true }); } e.stopPropagation(); });
     }
     const show = store.get('tabshow', 'solo'), canWin = !IS_HOMEAPP;
-    tabPop.innerHTML = `<div class="tp-row"><button type="button" class="uc-btn tp-tab">New tab</button>${canWin ? `<a class="uc-btn tp-win" href="/plugins/uncommander/uncommander.php" target="_blank" rel="opener"${IS_FF ? ' title="Firefox opens this as a tab - hold Shift while clicking for a window"' : ''}>New window</a><button type="button" class="uc-btn tp-app">Application window</button>` : ''}</div>
-      ${canWin && IS_FF ? '<div class="tp-tip">Firefox: Shift+click New window for a separate window</div>' : ''}
-      ${canWin ? `<div class="tp-show"><span class="tp-l">Show:</span><label class="chk"><input type="radio" name="tp-show" value="unraid"${show === 'unraid' ? ' checked' : ''}> with unRAID</label><label class="chk"><input type="radio" name="tp-show" value="solo"${show !== 'unraid' ? ' checked' : ''}> unCommander only</label></div>` : ''}
-      <div class="tp-name"><span class="tp-l">Name:</span><input type="text" class="tp-in" value="${esc(store.get('tabname', ''))}" placeholder="tab name…" spellcheck="false" maxlength="40"></div>`;
-    $('.tp-tab', tabPop).addEventListener('click', () => { tabPop.hidden = true; tabOpen('tab'); });      // a browser tab - the + in the tab row adds one there
+    const opt = (name, value, on, label, sub) => `<label class="tp-opt"><input type="radio" name="${name}" value="${esc(value)}"${on ? ' checked' : ''}><span class="tp-ot"><span class="tp-on">${esc(label)}</span>${sub ? `<span class="tp-sub">${esc(sub)}</span>` : ''}</span></label>`;
+    tabPop.innerHTML = `<div class="ctx-h"><span class="dot" aria-hidden="true">🟢</span><span class="t">New tab</span></div><div class="go-sec"><div class="go-h">Open</div>
+        <div class="tp-row"><button type="button" class="uc-btn tp-tab">New tab</button>${canWin ? `<a class="uc-btn tp-win" href="/plugins/uncommander/uncommander.php" target="_blank" rel="opener"${IS_FF ? ' title="Firefox opens this as a tab - hold Shift while clicking for a window"' : ''}>New window</a><button type="button" class="uc-btn tp-app">Application window</button>` : ''}</div>
+        ${canWin && IS_FF ? '<div class="tp-tip">Firefox: Shift+click New window for a separate window</div>' : ''}</div>
+      ${canWin ? `<div class="go-sec"><div class="go-h">Show</div><div class="tp-opts">${opt('tp-show', 'unraid', show === 'unraid', "With unRAID's menu")}${opt('tp-show', 'solo', show !== 'unraid', 'unCommander only')}</div></div>` : ''}
+      ${PROFILES.length ? `<div class="go-sec"><div class="go-h">Start with</div><div class="tp-opts tp-start">${opt('tp-start', '', true, 'The folders open now')}${PROFILES.map(x => opt('tp-start', x.name, false, x.name, profSub(x))).join('')}</div></div>` : ''}`;
+    const startWith = () => { const r = $('input[name=tp-start]:checked', tabPop); return r ? r.value : ''; };
+    $('.tp-tab', tabPop).addEventListener('click', () => { tabPop.hidden = true; tabOpen('tab', tabPrep('tab', startWith())); });      // a browser tab - the + in the tab row adds one there
     if (canWin) {
       /* Chrome and Edge open a normal window when asked for one; Firefox puts it in a tab unless
        * the link is Shift+clicked - so this is a real link, with its new tab ready before the click */
       const tw = $('.tp-win', tabPop); let prep = null;
-      const ready = () => { if (!prep) { prep = tabPrep('win'); tw.href = prep.url; } };
+      const ready = () => { if (!prep) { prep = tabPrep('win', startWith()); tw.href = prep.url; } };
+      tabPop.addEventListener('change', e => { if (e.target.name === 'tp-start' && prep) { tabForget(prep.id); prep = null; tw.href = '/plugins/uncommander/uncommander.php'; } });
       tw.addEventListener('pointerdown', ready); tw.addEventListener('focus', ready);
       tw.addEventListener('click', e => {
         ready(); tabPop.hidden = true;
         if (e.shiftKey) return;                       // the browser's own "open in a new window"
         e.preventDefault(); tabOpen('win', prep); prep = null;
       });
-      $('.tp-app', tabPop).addEventListener('click', () => { tabPop.hidden = true; tabOpen('app'); });
+      $('.tp-app', tabPop).addEventListener('click', () => { tabPop.hidden = true; tabOpen('app', tabPrep('app', startWith())); });
     }
     $$('input[name=tp-show]', tabPop).forEach(r => r.addEventListener('change', () => store.set('tabshow', r.value)));
-    const inp = $('.tp-in', tabPop);
-    inp.addEventListener('input', () => { store.set('tabname', inp.value.trim()); tabShowName(); winDraw(); });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { tabPop.hidden = true; tabTouch(); root.focus({ preventScroll: true }); } });
     const b = $('.uc-tabcombo').getBoundingClientRect();
     tabPop.hidden = false;
     tabPop.style.left = '0px'; tabPop.style.top = '0px';
@@ -10195,7 +10762,7 @@
     sound.play('click');
   }
   if (tabBtn) tabBtn.addEventListener('click', tabPanel);
-  if (tabEl) tabEl.addEventListener('click', () => { tabPanel(); const i = tabPop && $('.tp-in', tabPop); if (i && !tabPop.hidden) { i.focus(); i.select(); } });
+  if (tabEl) tabEl.addEventListener('click', e => { e.stopPropagation(); if (tabPop) tabPop.hidden = true; profMenu(); });
   tabShowName();
 
   /* ---------- the array stopped: what still works, and back to normal when it starts ---------- */
@@ -10279,6 +10846,7 @@
     } else if (mr) store.set('mus', null);
     const g = panes.find(p => store.get('gal' + p.i, false) && p.mode === 'dir' && !p.root);
     if (g) galSet(g, true);
+    profGo();                  // a new tab that was asked to start with a profile
   });
   pollJobs('init');
   /* unRAID draws its own title bar (icon + page name) above every page.

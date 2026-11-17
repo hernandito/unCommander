@@ -18,12 +18,14 @@ Everything unCommander (uC) can do, and how to do it. New here? The [README](../
 - [Finding a name: jump or filter](#finding-a-name-jump-or-filter)
 - [Columns, disks and permissions](#columns-disks-and-permissions)
 - [Tabs and windows](#tabs-and-windows)
+- [Profiles: layouts you come back to](#profiles)
 - [Using uC on an iPad](#using-uc-on-an-ipad)
 
 **Working with files**
 - [Copy and move](#copy-and-move)
 - [Jobs: work in the background](#jobs-work-in-the-background)
 - [The cart and Tag for delete](#the-cart-and-tag-for-delete)
+- [Hard and symbolic links](#hard-and-symbolic-links)
 - [Upload and download](#upload-and-download)
 - [Rename and batch rename](#rename-and-batch-rename)
 - [Delete, the trash and Restore](#delete-the-trash-and-restore)
@@ -131,10 +133,24 @@ Just start typing while uC has the focus (or tap the **Jump** box on a tablet).
 
 [![uC inside unRAID, in its own tab, and as an app window](../screenshots/views.png)](../screenshots/views.png)
 
-- The **tabs** button in the top bar opens a new tab with its own two panes; tabs can have names.
+- The **New tab** button in the top bar opens a new tab, window or application window with its own two panes. It can start with the folders open now or with one of your [profiles](#profiles).
+- The box next to it shows the tab's profile, or the name you gave the tab, or else the active folder. Click it for the profiles and *Rename this tab…*.
 - **In its own browser tab:** Settings → General has the button. uC fills the whole window, with its own tab icon.
+- **Always in a new tab:** in Settings → General, *Clicking unCommander in unRAID's top menu* can open it in a new browser tab - **with unRAID's menu** (uC inside unRAID, in a tab of its own) or **without** (the whole window). The unRAID page stays where it was, and clicking again goes back to that tab instead of opening another.
 - **As an app window:** a minimal window with no browser bars, like a desktop file manager.
 - Each tab and window keeps its own panes, so you can have several open at once.
+
+<a id="profiles"></a>
+## Profiles: layouts you come back to
+
+A profile is a named layout, like Krusader's: both panes' folders, which pane is active, the sort, hidden files, each pane's columns, list or Gallery, the folders open in the tree, the ticks, the filter (when typing filters - Settings → Keyboard), the music library view and the player (shown, pinned or not). So a profile can open straight into your music, ready to play. History and the playlist itself aren't part of it. A tree folder that's gone is left out; the others show what they hold now.
+
+- **Make one:** set the panes up the way you want, click the box next to the **New tab** button, and choose **Save what's open now as a new profile…**.
+- **Load one:** click that box and pick it. The box then shows the profile's name, with a **dot** when you've changed something since it was saved.
+- **Change one:** load it, change the panes, then choose **Update "name"** in the box.
+- **Start a new tab with one:** the **New tab** button has a *Start with* list. In a tab row, right-click the **+**.
+- **Rename, reorder or remove:** Settings → **Profiles**.
+- Profiles are kept on the server, so every browser and device has the same ones.
 
 ## Using uC on an iPad
 
@@ -171,6 +187,27 @@ Just start typing while uC has the focus (or tap the **Jump** box on a tablet).
 - **Add to cart** (right-click menu) collects files and folders from as many places as you like. Then copy or move the whole cart in one job.
 - **Tag for delete** does the same for deleting: build up a list as you browse, then delete it all at once, with Undo.
 
+## Hard and symbolic links
+
+Make files - or whole folders - appear in a second place without copying them.
+
+1. Open the destination in the other pane.
+2. Tick what you want to link, right-click, and choose **Link in the other pane…**
+3. Pick the kind of link and press **Make links**.
+
+| | Hard link | Symbolic link |
+|---|---|---|
+| What it is | The same file in two places | A shortcut to the original |
+| Space used | None - the file's space is counted once | None |
+| If the original is deleted | The link keeps the file | The link breaks |
+| Across disks or pools | **No** - both places must be on the same disk or pool | Yes |
+| Folders | Rebuilt in the other pane, with every file inside hard-linked | One link to the folder |
+
+- **Same disk or pool:** a hard link can't leave its disk. uC checks before making anything and tells you plainly if the two sides are on different disks. In `/mnt/user` both folders have to be on the same disk or pool underneath - the usual set-up for torrents and media.
+- **Nothing is replaced:** a name already in the other pane is skipped.
+- **Undo** removes the new links; the originals stay exactly as they are.
+- **See which files are hard-linked:** a file with more than one hard link shows a **🔗 2** badge (or 3…) after its name, and a symbolic link shows **↪ link**. Handy for checking that Radarr or Sonarr really hard-linked a download instead of copying it.
+
 ## Upload and download
 
 - **Upload:** drop files from your computer onto a pane. Big files go up in chunks, and the progress shows in the pane.
@@ -186,6 +223,8 @@ Just start typing while uC has the focus (or tap the **Jump** box on a tablet).
   - **Add text** - at the start or end;
   - **Number** - with a pattern using `[n]`, `[name]`, `[date]` and `[folder]`, a start number, digits, and order by name or date;
   - **Change case**.
+- **Saved rules:** set a rule up, then **Save these settings as…** at the top gives it a name. Pick it from the **Saved** list next time and everything is filled in: the kind, the boxes and the ticks. Saving under a name you already have replaces that rule; the ✕ in the list deletes one. Saved rules are kept on the server, so every browser has them.
+- **Used recently:** the ▾ in Find, Replace with, Text to add and New name lists what you last renamed with there (kept in this browser). **Clear this list** empties it.
 - A live **Now → After** list shows every new name. Clashes and invalid names turn red, and you can untick single rows.
 - It's all-or-nothing: if any item can't be renamed, every item keeps its old name. Swaps (a ↔ b) and case-only changes work. **Undo** puts all the old names back.
 
@@ -280,6 +319,10 @@ Both run as jobs with a real progress bar.
 - **Gallery view** (the view switch in the pane header) shows pictures as tiles, with a **preview pane** that also plays video and audio and peeks into text files.
 - **Picture editor** (Edit on a picture): rotate, flip, crop (with shapes), straighten and resize, then save as JPG, PNG, WebP or GIF. JPG turns are lossless. **Save as new** or **Replace** - replacing can be undone.
 - **HEIC photos** from iPhones open and convert in any browser.
+- **Where Gallery stays on:** in the folder you turned it on in and every folder inside it. Going up past it, Back, a shortcut, Go to… or a profile somewhere else goes back to the normal list.
+- **Gallery width:** in Gallery view, drag the line between the panes to give the preview more room; double-click it for half and half. The cards keep their size and wrap, like icons in a file window; when the gallery side gets narrow it shows the normal file list (with your columns) and the preview stays. The gallery side keeps its width when you resize the browser - only the preview changes. Hover the preview for ‹ › to go through the pictures. Outside Gallery the panes are always half and half.
+- **Photo details:** the picture viewer fills the window, with the photo's details in a column on the right (hide it with **Details**): camera, lens, shutter, aperture, ISO, focal length, date taken, size, and - when the camera recorded it - where it was taken, with a **Show on Google Maps** link. The Gallery preview shows the same details under the picture. Read from JPG, HEIC, TIFF and RAW files.
+- **RAW photos** (Fuji RAF, Nikon NEF, Canon CR2/CR3, Sony ARW, DNG, Olympus ORF, Panasonic RW2, Pentax PEF, Samsung SRW) show in the viewer and Gallery from the camera's own JPG preview inside the file - full size on most cameras, about 13 MP on Fuji. Nothing to install. Right-click → **Save as JPG** puts that preview next to the RAW as a .jpg. RAW files are never changed.
 
 ## Video player
 
@@ -399,7 +442,7 @@ Finds albums with **missing covers**, **mixed formats**, **missing tracks**, and
 [![Colour themes, light and dark](../screenshots/themes.png)](../screenshots/themes.png)
 
 Settings → Look & sound:
-- **Colour themes:** unCommander blue, unRAID orange, Graphite, Mono, Teal, Violet, Forest, and **Norton - an homage**. Each has light and dark colours and follows unRAID's own theme (Settings → Display Settings in unRAID).
+- **Colour themes:** unCommander blue, unRAID orange (also with a grey frame), Graphite, Mono, Mist, Teal, Violet, Forest, and **Norton - an homage** (a softer, modern take on the blue Norton / Midnight Commander screens). Each has light and dark colours and follows unRAID's own theme (Settings → Display Settings in unRAID).
 - **Edit any colour** with the colour picker, or save your own theme. **Undo my changes** goes back to the theme as it came.
 - **Your own CSS** is applied over uC's, with live preview, ready-made examples, a colour picker and a list of every variable.
 - **Text size on this device** (80%-140%) scales all of uC's text, rows and columns, separately on each device.
@@ -428,6 +471,7 @@ Settings → General:
 |---|---|
 | **General** | uC in unRAID (menu name, own tab, tab row), folder tree, video and music, tapping rows, when a job finishes, auto-refresh, About |
 | **Shortcuts** | Your favourite folders: add, rename, reorder, remove |
+| **Profiles** | Your saved layouts: rename, reorder, remove |
 | **Look & sound** | Colour themes, text size on this device, your own CSS, highlighting, sounds |
 | **Safety & trash** | Practice mode, Whole system view, Trash & History (days kept, uC's folder, Empty the trash now) |
 | **Tools** | All the tools, their *Display icon in UI* boxes, and the Radarr, Sonarr and Lidarr connections |
@@ -509,6 +553,7 @@ tar xzf /boot/uncommander-settings-backup.tgz -C /boot/config/plugins
 - **Something looks out of date after an update:** reload the page (Ctrl+F5). The Settings window's title shows the installed version.
 - **A folder is slow to open:** usually a disk spinning up. uC shows *Opening… N s* with **Cancel**; after 60 s it gives up with a message.
 - **A video won't play:** the first play may wait for ffmpeg to download. If the server is offline, it can't.
+- **"Intel/AMD graphics: not available":** converting video on Intel or AMD graphics needs the VA-API video drivers, which unRAID doesn't include. uC uses the CPU instead - pick **Use the CPU** or **Automatic** in Settings → General → Video and music.
 - **.rar or .7z won't open:** 7-Zip is downloaded at install. If the server was offline then, reinstall the plugin while online.
 - **The terminal says "Connection closed":** it reconnects by itself when you come back to the page; tap it if it doesn't.
 - **Still stuck?** Ask in the [support thread](https://forums.unraid.net/topic/200949-plugin-uncommander-%E2%AD%90-a-powerful-two-pane-file-manager/) - screenshots help a lot.

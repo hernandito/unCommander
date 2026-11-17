@@ -247,6 +247,54 @@ function uc_pldirs_clean($a): array {
   }
   return array_slice($out, 0, 10);
 }
+/* Profiles: a tab's whole set-up saved by name (both panes' folders, which is active, sorting,
+ * columns, list or Gallery view, the filter, hidden files) - made in the panes, kept on the server. */
+/* Batch rename's saved rules: a name and the settings of one rule (any of the four kinds) */
+function uc_brrules_clean($a) {
+  $out = []; $seen = [];
+  $t = fn($x, $n = 200) => mb_substr(str_replace("\0", '', (string)$x), 0, $n);
+  foreach (array_slice(is_array($a) ? $a : [], 0, 50) as $r) {
+    if (!is_array($r)) continue;
+    $name = trim(preg_replace('/\s+/u', ' ', $t($r['name'] ?? '', 40)));
+    if ($name === '' || isset($seen[mb_strtolower($name)])) continue;
+    $seen[mb_strtolower($name)] = 1;
+    $mode = in_array($r['mode'] ?? '', ['replace', 'add', 'number', 'case'], true) ? $r['mode'] : 'replace';
+    $out[] = ['name' => $name, 'mode' => $mode, 'find' => $t($r['find'] ?? ''), 'repl' => $t($r['repl'] ?? ''),
+      'mcase' => !empty($r['mcase']), 'first' => !empty($r['first']), 'regex' => !empty($r['regex']), 'keepExt' => !array_key_exists('keepExt', $r) || !empty($r['keepExt']),
+      'addText' => $t($r['addText'] ?? ''), 'addWhere' => ($r['addWhere'] ?? '') === 'after' ? 'after' : 'before',
+      'pattern' => $t($r['pattern'] ?? '[name] [n]'), 'start' => max(0, min(999999, (int)($r['start'] ?? 1))), 'digits' => max(1, min(9, (int)($r['digits'] ?? 2))),
+      'order' => ($r['order'] ?? '') === 'date' ? 'date' : 'name',
+      'caseTo' => in_array($r['caseTo'] ?? '', ['lower', 'upper', 'title', 'sentence'], true) ? $r['caseTo'] : 'lower'];
+  }
+  return $out;
+}
+function uc_profiles_clean($a): array {
+  $out = []; $seen = [];
+  foreach (array_slice(is_array($a) ? $a : [], 0, 50) as $p) {
+    if (!is_array($p)) continue;
+    $name = trim(preg_replace('/[\x00-\x1f]+/', ' ', mb_substr((string)($p['name'] ?? ''), 0, 40)));
+    if ($name === '' || isset($seen[mb_strtolower($name)])) continue;
+    $panes = [];
+    foreach ([0, 1] as $i) {
+      $q = (array)(($p['panes'] ?? [])[$i] ?? []);
+      $path = (string)($q['path'] ?? '');
+      if ($path === '' || $path[0] !== '/' || str_contains($path, "\0") || strlen($path) > 4096) continue 2;
+      $cols = [];
+      foreach (['size', 'disk', 'date', 'mode', 'mtime', 'perm'] as $k) if (isset($q['cols'][$k])) $cols[$k] = (bool)$q['cols'][$k];
+      /* the folder tree's open folders (paths inside the pane's folder) and the ticked names, kept small for the flash drive */
+      $str = fn($x) => is_string($x) && $x !== '' && strlen($x) <= 4096 && !str_contains($x, "\0");
+      $tree = array_values(array_filter(array_slice((array)($q['tree'] ?? []), 0, 200), fn($t) => $str($t) && str_starts_with($t, rtrim($path, '/') . '/')));
+      $sel = array_values(array_filter(array_slice((array)($q['sel'] ?? []), 0, 500), $str));
+      $cur = $str($q['cur'] ?? null) ? $q['cur'] : '';
+      $panes[] = ['path' => $path, 'gal' => !empty($q['gal']), 'cols' => $cols, 'flt' => mb_substr((string)($q['flt'] ?? ''), 0, 100), 'tree' => $tree, 'sel' => $sel, 'cur' => $cur];
+    }
+    $seen[mb_strtolower($name)] = 1;
+    $out[] = ['name' => $name, 'active' => !empty($p['active']) ? 1 : 0, 'sort' => preg_match('/^[a-z]{1,10}$/', (string)($p['sort'] ?? '')) ? $p['sort'] : 'name',
+              'rev' => !empty($p['rev']), 'hidden' => !empty($p['hidden']), 'panes' => $panes,
+              'mus' => is_string($p['mus'] ?? null) && str_starts_with($p['mus'], '/') && strlen($p['mus']) <= 4096 ? $p['mus'] : '', 'bp' => !empty($p['bp']), 'pin' => !empty($p['pin'])];
+  }
+  return $out;
+}
 function uc_settings(): array {
   $f = dirname(UC_CFG) . '/settings.json';
   $s = is_file($f) ? (json_decode(file_get_contents($f), true) ?: []) : [];
@@ -266,7 +314,10 @@ function uc_settings(): array {
     'tree'       => !empty($s['tree']),          // a caret opens folders in place (Settings > General)
     'palette'    => array_key_exists('palette', $s) ? uc_palette_clean($s['palette']) : (is_file($f) ? uc_palette_clean(null) : UC_PAL_DEFAULT),   // Settings > Colours (new installs: unRAID orange; upgrades from before colours keep the blue they had)
     'mythemes'   => array_values(array_filter(array_map(fn($t) => is_array($t) && trim((string)($t['name'] ?? '')) !== '' ? ['name' => mb_substr(trim((string)$t['name']), 0, 40)] + uc_palette_clean($t) : null, is_array($s['mythemes'] ?? null) ? array_slice($s['mythemes'], 0, 30) : []))),
-    'menu_show'  => !array_key_exists('menu_show', $s) || !empty($s['menu_show']),   // the entry in unRAID's top menu bar
+    'menu_show'  => !array_key_exists('menu_show', $s) || !empty($s['menu_show']),
+    'profiles'   => uc_profiles_clean($s['profiles'] ?? []),
+    'brrules'    => uc_brrules_clean($s['brrules'] ?? []),
+    'menu_newtab' => in_array($s['menu_newtab'] ?? '', ['solo', 'unraid'], true) ? $s['menu_newtab'] : (($s['menu_newtab'] ?? false) === true ? 'solo' : ''),   // the top-menu entry opens unCommander in a new browser tab: '' no, 'solo' on its own, 'unraid' with unRAID's menu   // the entry in unRAID's top menu bar
     'vplay'      => !array_key_exists('vplay', $s) || !empty($s['vplay']),       // Play any video (ffmpeg, fetched the first time a video needs it)
     'vsmooth'    => !array_key_exists('vsmooth', $s) || !empty($s['vsmooth']),   // videos always through ffmpeg (smoother from the array)
     'vconv'      => in_array($s['vconv'] ?? 'auto', ['auto', 'off', 'cpu', 'nvidia', 'vaapi'], true) ? ($s['vconv'] ?? 'auto') : 'auto',   // convert the picture: automatic = the graphics when they work
@@ -572,9 +623,20 @@ function uc_ff_start(): void {
   exec('setsid nohup bash -c ' . escapeshellarg($sh) . ' >/dev/null 2>&1 &');
   touch($gzf . '.part');           // counts as downloading from now on
 }
+/* Intel/AMD graphics go through VA-API: ffmpeg needs the system's libva, which stock unRAID doesn't have
+ * (without it ffmpeg stops with an assertion instead of an error). Checked once per request. */
+const UC_NO_VAAPI = "Intel/AMD graphics need the VA-API video drivers (libva), which unRAID doesn't include - use the CPU instead";
+function uc_vaapi_libs(): bool {
+  static $ok = null;
+  if ($ok !== null) return $ok;
+  foreach (['/usr/lib64', '/usr/lib', '/lib64', '/lib', '/usr/lib/x86_64-linux-gnu', '/usr/local/lib'] as $d) if (is_file("$d/libva-drm.so.2") && is_file("$d/libva.so.2")) return $ok = true;
+  exec('ldconfig -p 2>/dev/null', $l);
+  return $ok = (bool)preg_grep('/libva-drm\.so\.2\b/', $l) && (bool)preg_grep('/\blibva\.so\.2\b/', $l);
+}
 /* A 2-second test picture made with the CPU, NVIDIA or Intel/AMD graphics: does it work here? */
 function uc_gpu_try(string $mode): array {
   $ff = uc_ffmpeg(); if (!$ff) return ['ok' => false, 'error' => 'no ffmpeg', 'secs' => 0];
+  if ($mode === 'vaapi' && !uc_vaapi_libs()) return ['ok' => false, 'error' => UC_NO_VAAPI, 'secs' => 0];
   $src = '-f lavfi -i testsrc2=size=1280x720:rate=25 -t 2';
   $cmd = ['cpu' => "$src -vf format=yuv420p -c:v libx264 -preset veryfast",
           'nvidia' => "-init_hw_device cuda=gpu -filter_hw_device gpu $src -vf format=yuv420p,hwupload -c:v h264_nvenc",
@@ -588,13 +650,14 @@ function uc_gpu_try(string $mode): array {
  * per boot (a short test each), kept in RAM. */
 function uc_vconv(bool $fresh = false): string {
   $set = uc_settings()['vconv'];
+  if ($set === 'vaapi' && !uc_vaapi_libs()) return 'cpu';                     // picked, but it can't work here
   if (in_array($set, ['cpu', 'nvidia', 'vaapi'], true)) return $set;          // picked in Settings
   $f = UC_STATE . '/vconv';
   if ($fresh) @unlink($f);
   $m = trim((string)@file_get_contents($f));
   if (in_array($m, ['cpu', 'nvidia', 'vaapi'], true)) return $m;
   $m = 'cpu';
-  foreach (uc_gpus() as $g) if (uc_gpu_try($g['id'])['ok']) { $m = $g['id']; break; }
+  foreach (uc_gpus() as $g) if (empty($g['nolib']) && uc_gpu_try($g['id'])['ok']) { $m = $g['id']; break; }
   @mkdir(UC_STATE, 0700, true); @file_put_contents($f, $m);
   return $m;
 }
@@ -604,7 +667,7 @@ function uc_gpus(): array {
   if (file_exists('/dev/nvidia0') && (is_executable('/usr/bin/nvidia-smi') || is_file('/usr/lib64/libnvidia-encode.so.1') || is_file('/usr/lib/libnvidia-encode.so.1'))) $g[] = ['id' => 'nvidia', 'label' => 'NVIDIA graphics'];
   foreach (glob('/dev/dri/renderD*') ?: [] as $dev) {
     $v = trim((string)@file_get_contents('/sys/class/drm/' . basename($dev) . '/device/vendor'));
-    if ($v === '0x8086' || $v === '0x1002') { $g[] = ['id' => 'vaapi', 'dev' => $dev, 'label' => ($v === '0x8086' ? 'Intel' : 'AMD') . ' graphics']; break; }
+    if ($v === '0x8086' || $v === '0x1002') { $g[] = ['id' => 'vaapi', 'dev' => $dev, 'label' => ($v === '0x8086' ? 'Intel' : 'AMD') . ' graphics'] + (uc_vaapi_libs() ? [] : ['nolib' => true]); break; }
   }
   return $g;
 }
@@ -652,6 +715,8 @@ const UC_PAL_KEYS = ['accent', 'accent-soft', 'accent-ink', 'cursor', 'cursor-of
   'fk-bg', 'fk-ink', 'fk-key', 'fk-line', 'fk-danger',
   /* text boxes and path bars, path-bar hover, logo, headings, column titles, the right-click menu */
   'input-bg', 'crumb-hover', 'crumb-hover-ink', 'logo-ink', 'head-ink', 'cols-bg', 'menu-bg', 'menu-line',
+  /* the active pane's frame and header (when not set: the accent) */
+  'frame', 'frame-ink',
   /* inside an archive: the strip under the pane header and the archive in the path bar */
   'arc-bg', 'arc-line'];
 /* the colours a new install starts with: the "unRAID orange" theme (same values as THEMES.unraid in the page) */
@@ -683,7 +748,11 @@ function uc_palette_css(array $p): string {
 /* A JPG's "which way is up" note (EXIF Orientation, 1-8) without the exif extension. */
 function uc_jpeg_orientation(string $p): int {
   $d = @file_get_contents($p, false, null, 0, 131072);
-  if ($d === false || strlen($d) < 4 || substr($d, 0, 2) !== "\xFF\xD8") return 1;
+  return $d === false ? 1 : uc_jpeg_orientation_data($d);
+}
+/* The same from the first bytes of a JPG; 0 = the JPG has no EXIF block at all */
+function uc_jpeg_orientation_data(string $d, bool $zeroIfNone = false): int {
+  if (strlen($d) < 4 || substr($d, 0, 2) !== "\xFF\xD8") return 1;
   $o = 2;
   while ($o + 4 < strlen($d)) {
     $m = unpack('n', substr($d, $o, 2))[1]; $len = unpack('n', substr($d, $o + 2, 2))[1];
@@ -698,7 +767,93 @@ function uc_jpeg_orientation(string $p): int {
     if ($m === 0xFFDA || ($m & 0xFF00) !== 0xFF00) break;
     $o += 2 + $len;
   }
-  return 1;
+  return $zeroIfNone ? 0 : 1;
+}
+
+/* ---------- RAW photos ----------
+ * Browsers can't show RAW files, but nearly every camera puts a JPG preview inside them
+ * (full size on most; Fuji around 13 MP). This finds the biggest one without reading the
+ * whole file: Fuji RAF says where it is in its header; Nikon, Canon CR2, Sony, DNG, Olympus,
+ * Panasonic and Pentax keep it in TIFF directories; Canon CR3 has one in its PRVW box.
+ * Returns [offset, length, orientation] or null. Orientation is the RAW's own (TIFF-type
+ * files), for previews that don't carry their own. */
+const UC_RAW_EXT = ['raf', 'nef', 'nrw', 'cr2', 'cr3', 'arw', 'srf', 'sr2', 'dng', 'orf', 'rw2', 'pef', 'srw'];
+function uc_raw_preview(string $p): ?array {
+  $fh = @fopen($p, 'rb'); if (!$fh) return null;
+  $size = (int)@filesize($p);
+  $rd = function (int $off, int $n) use ($fh, $size): string { if ($off < 0 || $off >= $size || $n <= 0) return ''; fseek($fh, $off); return (string)fread($fh, $n); };
+  $c = []; $or = 1;
+  /* a real, viewable JPG: starts right, and isn't the lossless kind some cameras keep the raw data in */
+  $add = function (int $off, int $len) use (&$c, $rd, $size) {
+    if ($len < 4096 || $off <= 0 || $off + $len > $size) return;
+    $d = $rd($off, 65536); if (substr($d, 0, 3) !== "\xFF\xD8\xFF") return;
+    for ($o = 2; $o + 4 <= strlen($d);) {
+      if ($d[$o] !== "\xFF") return;
+      $m = ord($d[$o + 1]);
+      if ($m === 0xC3 || $m === 0xC7 || $m === 0xCB || $m === 0xCF) return;     // lossless JPG: raw data, not a picture
+      if ($m >= 0xC0 && $m <= 0xC2) break;
+      if ($m === 0xDA) break;
+      $o += 2 + unpack('n', substr($d, $o + 2, 2))[1];
+    }
+    $c[] = [$off, $len];
+  };
+  $h = $rd(0, 512);
+  if (substr($h, 0, 15) === 'FUJIFILMCCD-RAW') {
+    [, $o, $l] = unpack('N2', substr($h, 84, 8)); $add($o, $l);
+  } elseif (substr($h, 4, 8) === 'ftypcrx ') {
+    $d = $rd(0, 4 * 1048576); $at = strpos($d, 'PRVW');
+    if ($at !== false && ($j = strpos($d, "\xFF\xD8\xFF", $at)) !== false && $j - $at < 64) $add($j, unpack('N', substr($d, $j - 4, 4))[1]);
+  } elseif (in_array(substr($h, 0, 4), ["II*\0", "MM\0*", 'IIRO', 'IIRS', "IIU\0"], true)) {
+    $le = $h[0] === 'I';
+    $u16 = fn($x, $at) => unpack($le ? 'v' : 'n', substr($x, $at, 2))[1];
+    $u32 = fn($x, $at) => unpack($le ? 'V' : 'N', substr($x, $at, 4))[1];
+    $sz = [1 => 1, 2 => 1, 3 => 2, 4 => 4, 5 => 8, 6 => 1, 7 => 1, 8 => 2, 9 => 4, 10 => 8, 11 => 4, 12 => 8, 13 => 4];
+    $todo = [[$u32($h, 4), 0]]; $seen = [];
+    while ($todo && count($seen) < 64) {
+      [$ifd, $lvl] = array_shift($todo);
+      if ($ifd <= 0 || $ifd >= $size || isset($seen[$ifd])) continue;
+      $seen[$ifd] = 1;
+      $n = $u16($rd($ifd, 2) . "\0\0", 0); if ($n <= 0 || $n > 500) continue;
+      $e = $rd($ifd + 2, $n * 12 + 4); if (strlen($e) < $n * 12) continue;
+      $t = [];
+      for ($i = 0; $i < $n; $i++) {
+        $tag = $u16($e, $i * 12); $type = $u16($e, $i * 12 + 2); $cnt = $u32($e, $i * 12 + 4);
+        $inl = ($sz[$type] ?? 1) * $cnt <= 4;
+        $val = $inl ? ($type === 3 || $type === 8 ? $u16($e, $i * 12 + 8) : $u32($e, $i * 12 + 8)) : $u32($e, $i * 12 + 8);
+        $t[$tag] = [$type, $cnt, $val, $inl];
+      }
+      if ($lvl === 0 && isset($t[0x0112])) $or = (int)$t[0x0112][2] ?: 1;
+      if (isset($t[0x0201], $t[0x0202])) $add($t[0x0201][2], $t[0x0202][2]);
+      if (isset($t[0x0111], $t[0x0117]) && $t[0x0111][1] === 1 && in_array($t[0x0103][2] ?? 0, [6, 7, 99], true)) $add($t[0x0111][2], $t[0x0117][2]);
+      if (isset($t[0x002E])) $add($t[0x002E][2], $t[0x002E][1]);        // Panasonic RW2: JpgFromRaw
+      if (isset($t[0x014A])) {                                            // SubIFDs (Nikon's full-size preview lives in one)
+        [$ty, $cn, $v, $in] = $t[0x014A];
+        if ($cn === 1) $todo[] = [$v, $lvl + 1];
+        else { $l = $rd($v, min($cn, 16) * 4); for ($k = 0; $k + 4 <= strlen($l); $k += 4) $todo[] = [$u32($l, $k), $lvl + 1]; }
+      }
+      if (isset($t[0x8769])) $todo[] = [$t[0x8769][2], $lvl + 1];         // Exif
+      if ($lvl === 0 && strlen($e) >= $n * 12 + 4) $todo[] = [$u32($e, $n * 12), 0];   // the next directory (IFD1...)
+    }
+  }
+  fclose($fh);
+  if (!$c) return null;
+  usort($c, fn($a, $b) => $b[1] <=> $a[1]);
+  return [$c[0][0], $c[0][1], $or];
+}
+/* The preview JPG's bytes. If the RAW says it's turned and the preview has no EXIF of its own,
+ * a tiny EXIF block with just that is put in, so the browser shows it the right way up. */
+function uc_raw_jpeg(string $p, ?array $pv = null): ?string {
+  $pv = $pv ?? uc_raw_preview($p); if (!$pv) return null;
+  [$off, $len, $or] = $pv;
+  if ($len > 64 * 1048576) return null;
+  $d = @file_get_contents($p, false, null, $off, $len);
+  if ($d === false || strlen($d) !== $len) return null;
+  if ($or > 1 && $or <= 8 && uc_jpeg_orientation_data(substr($d, 0, 131072), true) === 0) {
+    $tiff = "MM\0*" . pack('N', 8) . pack('n', 1) . pack('nnNn', 0x0112, 3, 1, $or) . "\0\0" . pack('N', 0);
+    $app = "Exif\0\0" . $tiff;
+    $d = "\xFF\xD8\xFF\xE1" . pack('n', strlen($app) + 2) . $app . substr($d, 2);
+  }
+  return $d;
 }
 
 /* ---------- Radarr (Tools > Movie folders without a video) ----------
@@ -1790,4 +1945,113 @@ function uc_scans_tidy(): void {
   $all = glob(UC_STATE . '/scans/*.json') ?: [];
   foreach ($all as $f) { $j = json_decode((string)@file_get_contents($f), true) ?: []; $t = ($j['tool'] ?? '?') . '/' . ($j['mode'] ?? ''); if (!isset($newest[$t]) || filemtime($f) > filemtime($newest[$t])) $newest[$t] = $f; }
   foreach ($all as $f) if (!in_array($f, $newest, true) && time() - filemtime($f) > 86400) { $b = substr($f, 0, -5); foreach (['.json', '.results', '.tree', '.list', '.list.sorted'] as $x) @unlink($b . $x); foreach (glob($b . '.tree.*') ?: [] as $x) @unlink($x); }
+}
+
+/* ---------- photo details (EXIF) ----------
+ * Read without PHP's exif extension, so it works the same everywhere, and from RAW files too:
+ * JPG and HEIC/PNG/WebP (their EXIF block), Fuji RAF (the preview's EXIF), Nikon/Canon CR2/
+ * Sony/DNG/Olympus/Panasonic/Pentax/TIFF (the file's own TIFF directories), Canon CR3 (its
+ * CMT boxes). Returns sections of [label, value] rows, and the GPS position when there is one. */
+function uc_tiff_read(callable $rd, int $base, int $first, int $size): array {
+  $h = $rd($base, 8); if (strlen($h) < 8) return [];
+  $le = substr($h, 0, 2) === 'II';
+  $u16 = fn($x, $at) => unpack($le ? 'v' : 'n', substr($x, $at, 2))[1];
+  $u32 = fn($x, $at) => unpack($le ? 'V' : 'N', substr($x, $at, 4))[1];
+  $s32 = fn($x, $at) => unpack('l', $le ? substr($x, $at, 4) : strrev(substr($x, $at, 4)))[1];
+  $sz = [1 => 1, 2 => 1, 3 => 2, 4 => 4, 5 => 8, 6 => 1, 7 => 1, 8 => 2, 9 => 4, 10 => 8, 11 => 4, 12 => 8];
+  $ifd = function (int $off) use ($rd, $base, $u16, $u32, $s32, $sz, $size): array {
+    $out = [];
+    $n = strlen($c = $rd($base + $off, 2)) === 2 ? $u16($c, 0) : 0;
+    if ($n <= 0 || $n > 400) return $out;
+    $e = $rd($base + $off + 2, $n * 12);
+    for ($i = 0; $i + 12 <= strlen($e); $i += 12) {
+      $tag = $u16($e, $i); $type = $u16($e, $i + 2); $cnt = $u32($e, $i + 4);
+      $len = ($sz[$type] ?? 1) * $cnt; if ($len <= 0 || $len > 65536) continue;
+      $d = $len <= 4 ? substr($e, $i + 8, $len) : $rd($base + $u32($e, $i + 8), $len);
+      if (strlen($d) < $len) continue;
+      $vals = [];
+      for ($k = 0; $k < min($cnt, 64); $k++) {
+        $vals[] = match ($type) {
+          3, 8 => $u16($d, $k * 2), 4 => $u32($d, $k * 4), 9 => $s32($d, $k * 4),
+          5 => ($b = $u32($d, $k * 8 + 4)) ? $u32($d, $k * 8) / $b : 0.0,
+          10 => ($b = $s32($d, $k * 8 + 4)) ? $s32($d, $k * 8) / $b : 0.0,
+          default => null };
+        if ($vals[$k] === null) { $vals = null; break; }
+      }
+      $out[$tag] = $type === 2 ? trim(rtrim($d, "\0")) : ($vals === null ? $d : (count($vals) === 1 ? $vals[0] : $vals));
+    }
+    return $out;
+  };
+  $t0 = $ifd($first);
+  $ex = isset($t0[0x8769]) && is_int($t0[0x8769]) ? $ifd($t0[0x8769]) : [];
+  $gps = isset($t0[0x8825]) && is_int($t0[0x8825]) ? $ifd($t0[0x8825]) : [];
+  return ['ifd0' => $t0, 'exif' => $ex, 'gps' => $gps, 'tiff' => [$le, $u32]];
+}
+function uc_photo_meta(string $p): array {
+  $size = (int)@filesize($p); $fh = @fopen($p, 'rb'); if (!$fh) return [];
+  $frd = function (int $off, int $n) use ($fh, $size): string { if ($off < 0 || $off >= $size || $n <= 0) return ''; fseek($fh, $off); return (string)fread($fh, $n); };
+  $srd = fn(string $s) => fn(int $off, int $n): string => $off < 0 || $off >= strlen($s) ? '' : substr($s, $off, $n);
+  $h = $frd(0, 512); $T = null;
+  /* an EXIF block inside a JPG-like stream: "Exif\0\0" then a TIFF header */
+  $fromBlock = function (string $s) use ($srd) {
+    foreach (["Exif\0\0II*\0", "Exif\0\0MM\0*"] as $sig) if (($at = strpos($s, $sig)) !== false) {
+      $le = $s[$at + 6] === 'I'; $first = unpack($le ? 'V' : 'N', substr($s, $at + 10, 4))[1];
+      return uc_tiff_read($srd($s), $at + 6, $first, strlen($s));
+    }
+    return null;
+  };
+  if (substr($h, 0, 15) === 'FUJIFILMCCD-RAW') {
+    [, $o] = unpack('N', substr($h, 84, 4)); $T = $fromBlock($frd($o, 262144));
+  } elseif (substr($h, 4, 8) === 'ftypcrx ') {
+    $d = $frd(0, 1048576); $T = ['ifd0' => [], 'exif' => [], 'gps' => []];
+    foreach (['CMT1' => 'ifd0', 'CMT2' => 'exif', 'CMT4' => 'gps'] as $box => $k) if (($at = strpos($d, $box)) !== false && in_array(substr($d, $at + 4, 4), ["II*\0", "MM\0*"], true)) {
+      $le = $d[$at + 4] === 'I'; $first = unpack($le ? 'V' : 'N', substr($d, $at + 8, 4))[1];
+      $T[$k] = uc_tiff_read($srd($d), $at + 4, $first, strlen($d))['ifd0'] ?? [];
+    }
+  } elseif (in_array(substr($h, 0, 4), ["II*\0", "MM\0*", 'IIRO', 'IIRS', "IIU\0"], true)) {
+    $le = $h[0] === 'I'; $T = uc_tiff_read($frd, 0, unpack($le ? 'V' : 'N', substr($h, 4, 4))[1], $size);
+  } else {
+    $T = $fromBlock($frd(0, 2 * 1048576));                    // JPG, HEIC, PNG, WebP...
+  }
+  fclose($fh);
+  if (!$T || (!$T['ifd0'] && !$T['exif'])) return [];
+  $a = $T['ifd0'] + []; $e = $T['exif']; $g = $T['gps'];
+  $v = fn($k) => $e[$k] ?? $a[$k] ?? null;
+  $str = fn($x) => is_string($x) && $x !== '' && mb_check_encoding($x, 'UTF-8') && !preg_match('/[\x00-\x08]/', $x) ? $x : null;
+  $num = fn($x, $d = 1) => rtrim(rtrim(number_format((float)$x, $d, '.', ''), '0'), '.');
+  $date = fn($x) => is_string($x) && preg_match('/^(\d{4}):(\d\d):(\d\d) (\d\d:\d\d)(:\d\d)?/', $x, $m) ? "$m[1]-$m[2]-$m[3] $m[4]" : null;
+  $rows = function (array $r) { return array_values(array_filter($r, fn($x) => $x[1] !== null && $x[1] !== '')); };
+  $et = $v(0x829A);
+  $exp = is_numeric($et) && $et > 0 ? ($et >= 0.5 ? $num($et) . ' s' : '1/' . round(1 / $et) . ' s') : null;
+  $fn = $v(0x829D); $iso = $v(0x8827); if (is_array($iso)) $iso = $iso[0];
+  $fl = $v(0x920A); $f35 = $v(0xA405); $bias = $v(0x9204);
+  $prog = [1 => 'Manual', 2 => 'Program', 3 => 'Aperture priority', 4 => 'Shutter priority', 5 => 'Creative', 6 => 'Action', 7 => 'Portrait', 8 => 'Landscape'][$v(0x8822)] ?? null;
+  $meter = [1 => 'Average', 2 => 'Centre-weighted', 3 => 'Spot', 4 => 'Multi-spot', 5 => 'Multi-segment', 6 => 'Partial'][$v(0x9207)] ?? null;
+  $flash = is_int($v(0x9209)) ? (($v(0x9209) & 1) ? 'Fired' : 'Did not fire') : null;
+  $wb = [0 => 'Auto', 1 => 'Manual'][$v(0xA403)] ?? null;
+  $w = $v(0xA002) ?: $a[0x0100] ?? null; $hh = $v(0xA003) ?: $a[0x0101] ?? null;
+  $orient = [1 => 'Normal', 2 => 'Mirrored', 3 => 'Upside down', 4 => 'Flipped', 5 => 'Mirrored, turned', 6 => 'Turned right', 7 => 'Mirrored, turned', 8 => 'Turned left'][$a[0x0112] ?? 0] ?? null;
+  $tz = $str($v(0x9011));
+  $out = [];
+  $out[] = ['Camera', $rows([['Camera', trim(($str($a[0x010F] ?? null) ?? '') . ' ' . ($str($a[0x0110] ?? null) ?? '')) ?: null],
+    ['Lens', $str($v(0xA434))], ['Lens maker', $str($v(0xA433))], ['Body serial', $str($v(0xA431))]])];
+  $out[] = ['Exposure', $rows([['Shutter', $exp], ['Aperture', is_numeric($fn) && $fn > 0 ? 'f/' . $num($fn) : null], ['ISO', is_numeric($iso) && $iso > 0 ? (string)$iso : null],
+    ['Focal length', is_numeric($fl) && $fl > 0 ? $num($fl) . ' mm' . (is_numeric($f35) && $f35 > 0 ? " ($f35 mm full-frame)" : '') : null],
+    ['Exposure comp.', is_numeric($bias) ? ($bias > 0 ? '+' : ($bias < 0 ? '−' : '±')) . $num(abs($bias)) . ' EV' : null],
+    ['Mode', $prog], ['Metering', $meter], ['Flash', $flash], ['White balance', $wb]])];
+  $out[] = ['Picture', $rows([['Taken', ($d = $date($v(0x9003))) ? $d . ($tz ? " ($tz)" : '') : null], ['Saved', $date($a[0x0132] ?? null)],
+    ['Size', is_int($w) && is_int($hh) && $w > 0 ? "$w × $hh" . ($w * $hh >= 1e6 ? ' (' . $num($w * $hh / 1e6) . ' MP)' : '') : null], ['Orientation', $orient],
+    ['Colour space', [1 => 'sRGB', 65535 => 'Uncalibrated / Adobe RGB'][$v(0xA001)] ?? null],
+    ['Title', $str($a[0x010E] ?? null)], ['Artist', $str($a[0x013B] ?? null)], ['Copyright', $str($a[0x8298] ?? null)], ['Software', $str($a[0x0131] ?? null)]])];
+  $gps = null;
+  $deg = fn($x) => is_array($x) && count($x) >= 3 ? $x[0] + $x[1] / 60 + $x[2] / 3600 : (is_numeric($x) ? (float)$x : null);
+  if (($la = $deg($g[2] ?? null)) !== null && ($lo = $deg($g[4] ?? null)) !== null && ($la != 0 || $lo != 0)) {
+    if (strtoupper((string)($g[1] ?? 'N'))[0] === 'S') $la = -$la;
+    if (strtoupper((string)($g[3] ?? 'E'))[0] === 'W') $lo = -$lo;
+    $gps = [round($la, 6), round($lo, 6)];
+    $alt = isset($g[6]) && is_numeric($g[6]) ? (($g[5] ?? 0) === 1 ? -1 : 1) * $g[6] : null;
+    $out[] = ['Location', $rows([['Latitude', sprintf('%.5f° %s', abs($la), $la < 0 ? 'S' : 'N')], ['Longitude', sprintf('%.5f° %s', abs($lo), $lo < 0 ? 'W' : 'E')],
+      ['Altitude', $alt !== null ? round($alt) . ' m' : null]])];
+  }
+  return ['sections' => array_values(array_filter($out, fn($s) => $s[1])), 'gps' => $gps];
 }

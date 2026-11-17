@@ -61,10 +61,26 @@ Already using unCommander? This release is packed. Since the first version you'l
 
 ---
 
+## 🆕 New in 2026.11.14
+
+- **Profiles:** save what both panes show - folders, sort, hidden files, columns, list or Gallery, open tree folders, ticks, filter, even the music library view and the player - under a name, and bring it back with one click from the box next to the **New tab** button. A dot shows when you've changed something since. New tab, New window and the tab row's **+** (right-click) can start with a profile. Settings → **Profiles** renames, reorders and removes them. Kept on the server, so every browser has them.
+- **RAW photos:** Fuji RAF, Nikon NEF, Canon CR2/CR3, Sony ARW, DNG, Olympus, Panasonic, Pentax and Samsung open in the viewer and Gallery from the camera's own preview inside the file. Right-click → **Save as JPG**. RAW files are never changed, and there's nothing to install.
+- **Photo details:** camera, lens, shutter, aperture, ISO, focal length, date taken, size - and where it was taken, with a **Google Maps** link, when the photo has GPS. Beside the picture in the viewer; beside or under it in the Gallery preview.
+- **A bigger picture viewer** that fills the window, with **‹ ›** over the picture.
+- **Gallery, reworked:** drag the line between the panes to make the preview bigger; cards keep their S/M/L size and wrap; a narrow gallery turns into the normal file list; **‹ ›** over the preview; folders show a fan of the pictures inside them; Gallery turns itself off when you leave the folder you started it in.
+- **Batch rename:** save rules you use often and pick them again; each box remembers what you renamed with recently; a **Regex cheat sheet** with ready-made patterns to click; accented names (é, í…) match however the file spells them.
+- **Hard and symbolic links:** right-click → *Link in the other pane…*, with link badges in the list. Undo removes them.
+- **New themes:** Mist and unRAID orange with a grey frame; Norton is softer and more modern.
+- **Open in a new tab** from unRAID's top menu - with or without unRAID's menu (Settings → General).
+- **Intel/AMD graphics:** when unRAID lacks the VA-API drivers, Settings says so and videos use the CPU - no more ffmpeg error.
+
+---
+
 ## 📑 Contents
 
 - 📖 **[User Guide](docs/USER-GUIDE.md)** - every feature, step by step
 - [New in 2026.11](#-new-in-202611---the-biggest-update-yet)
+- [New in 2026.11.14](#-new-in-20261114)
 - [Why unCommander](#-why-uncommander)
 - [Three ways to use it](#-three-ways-to-use-it)
 - [The basics](#-the-basics)
@@ -100,7 +116,7 @@ Already using unCommander? This release is packed. Since the first version you'l
 [![uC inside unRAID, in its own tab, and as an app window](screenshots/views.png)](screenshots/views.png)
 
 - **Inside unRAID:** open it from the top menu bar, with unRAID's header and menus around it.
-- **In its own tab:** the whole browser window for your files, with its own icon in the tab. Settings → General has the button.
+- **In its own tab:** the whole browser window for your files, with its own icon in the tab. Settings → General has the button, and you can have unRAID's top-menu entry always open uC in a new tab, with or without unRAID's menu.
 - **As an app:** a minimal application window with no browser bars, or on the iPad, *Share → Add to Home Screen* for an app icon. It looks and feels like a desktop file manager.
 
 Each tab or window keeps its own panes, so you can have several open at once.
@@ -128,6 +144,7 @@ Each tab or window keeps its own panes, so you can have several open at once.
 - **Folder tree:** an optional caret opens folders right inside the list.
 - **One pane** gives the other the full width, for long names.
 - **Tabs:** each tab keeps its own panes and name. Tabs can live inside unRAID, in their own browser tab, or in an application window.
+- **Profiles:** save both panes' folders, sort, columns, view, open tree folders, ticks, filter, music view and player under a name, and bring them back in any tab, on any browser.
 - **Whole OS:** a switch in the top bar to go beyond `/mnt` and `/boot` when you really need to.
 
 **What each row tells you:**
@@ -145,6 +162,7 @@ Each tab or window keeps its own panes, so you can have several open at once.
 
 - **Copy (F5) and Move (F6)** go to the other pane. You can also **drag and drop** between panes or onto a folder, or use **Ctrl+C / Ctrl+X** then **Ctrl+V**, which shows a Paste window first.
 - **The cart:** collect files from several folders, then copy or move them all at once. **Tag for delete** builds a delete list the same way.
+- **Hard and symbolic links:** *Link in the other pane…* on the right-click menu makes the ticked files - or whole folders - appear in the other pane without using any space. uC checks first that a hard link stays on one disk or pool, and files with more than one hard link show a **🔗 2** marker (symbolic links show **↪ link**), so you can see at a glance whether your downloads were really hard-linked.
 - **Upload and download:** drop files from your computer into a pane to upload them, chunked and safe for big files. Download any file, or a whole selection as one zip.
 - **Jobs run in the background:**
   - copies use `rsync` at low priority, and a move on the same disk is instant;
@@ -169,7 +187,7 @@ Rename the ticked items four ways:
 - **Number** them, with patterns like `[name]`, `[n]`, `[date]` and `[folder]`;
 - **Change case**.
 
-A live before → after list shows every new name, marks clashes in red, and lets you untick single rows. The whole rename can be undone.
+A live before → after list shows every new name, marks clashes in red, and lets you untick single rows. The whole rename can be undone. Save a rule you use often under a name and pick it again later, and each box remembers what you renamed with recently.
 
 ### Also on the menu
 - **Compress / Extract:** .zip, .tar.gz, .rar (incl. RAR5), .7z, .tar.bz2/xz/zst and more, with real progress. F3 on an archive lists what's inside.
@@ -218,6 +236,8 @@ A live before → after list shows every new name, marks clashes in red, and let
 - **Gallery view:** pictures as tiles, with a preview pane that also plays video and audio and peeks into text files.
 - **Picture editor:** rotate, flip, crop (with shapes), straighten, resize, and save as JPG, PNG, WebP or GIF. JPG turns are lossless, and you can save as new or replace (undoable).
 - **HEIC photos** from iPhones open and convert in any browser.
+- **Photo details:** the picture viewer fills the window, with the photo's details in a column on the right (hide it with **Details**): camera, lens, shutter, aperture, ISO, focal length, date taken, size, and - when the camera recorded it - where it was taken, with a **Show on Google Maps** link. The Gallery preview shows the same details under the picture. Read from JPG, HEIC, TIFF and RAW files.
+- **RAW photos** (Fuji RAF, Nikon NEF, Canon CR2/CR3, Sony ARW, DNG, Olympus ORF, Panasonic RW2, Pentax PEF, Samsung SRW) show in the viewer and Gallery from the camera's own JPG preview inside the file - full size on most cameras, about 13 MP on Fuji. Nothing to install. Right-click → **Save as JPG** puts that preview next to the RAW as a .jpg. RAW files are never changed.
 
 **Video player:** plays almost any video right in the browser, including on the iPad.
 - Sound and picture are converted on the fly when needed, on the CPU, NVIDIA or Intel/AMD.
@@ -316,7 +336,7 @@ It can make covers, merge discs, rename files to their tags, keep one format, an
 [![Colour themes, light and dark](screenshots/themes.png)](screenshots/themes.png)
 
 **Colours:**
-- **Colour themes:** unCommander blue, unRAID orange, Graphite, Mono, Teal, Violet, Forest and **Norton - an homage** to the blue Norton / Midnight Commander screens.
+- **Colour themes:** unCommander blue, unRAID orange (also with a grey frame), Graphite, Mono, Mist, Teal, Violet, Forest, and **Norton - an homage**, a softer, modern take on the blue Norton / Midnight Commander screens.
 - Each theme has light and dark colours and follows unRAID's own theme (Settings → Display Settings). Edit any colour, or save your own themes.
 - **Your own CSS**, with live preview, ready-made examples, a colour picker and a reference of every variable.
 
@@ -450,7 +470,7 @@ In the [support thread](https://forums.unraid.net/topic/200949-plugin-uncommande
 The source lives in `src/`, laid out like the paths on the server. Run:
 
 ```
-UC_VERSION=2026.11.09a \
+UC_VERSION=2026.11.14 \
 UC_PLUGIN_URL=https://raw.githubusercontent.com/hernandito/unCommander/main/uncommander.plg \
 python3 build.py
 ```
