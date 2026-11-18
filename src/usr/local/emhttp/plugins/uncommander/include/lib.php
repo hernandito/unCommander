@@ -335,6 +335,7 @@ function uc_settings(): array {
     'first'      => !is_file($f),                            // a new install: the setup window asks where unCommander's folder goes
     'array'      => uc_array_up(),
     'data_dir'   => uc_hist_dir(),
+    'docker_dir' => uc_docker_dir(),                         // Docker's appdata location + /uncommander
     'hist_dir'   => (string)($s['hist_dir'] ?? ''),           // Settings > Trash & History: where History is kept (empty = appdata)   // the music player at the bottom (Settings > General)
     'pldirs'     => uc_pldirs_clean($s['pldirs'] ?? []),
   ];

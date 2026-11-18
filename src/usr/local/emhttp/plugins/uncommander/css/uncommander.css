@@ -3386,3 +3386,14 @@ html.uc-noselect input, html.uc-noselect textarea, html.uc-noselect #uc .uc-dlg 
 @keyframes fan-pulse { 50% { opacity: .55; } }
 #uc .gp-body:hover .gp-fan:not(.loading) .fc1 { transform: rotate(-14deg) translateX(-24%); }
 #uc .gp-body:hover .gp-fan:not(.loading) .fc2 { transform: rotate(14deg) translateX(24%); }
+/* Settings > Safety & trash: when Docker keeps appdata somewhere else, a clear box to switch */
+#uc .st-docker { display: flex; align-items: center; gap: 14px; margin: 4px 0 6px; padding: 12px 14px; border: 1px solid var(--accent); border-left-width: 4px; border-radius: 8px; background: var(--accent-soft); }
+#uc .st-docker-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: calc(13px * var(--fs, 1)); }
+#uc .st-docker-t b { color: var(--ink); }
+#uc .st-docker-t span { color: var(--ink-2); }
+#uc .st-docker code { font-family: var(--mono); font-size: .95em; overflow-wrap: anywhere; }
+#uc .st-docker-p { color: var(--accent); font-weight: 600; }
+#uc .st-docker .uc-btn { flex: none; }
+@media (max-width: 640px) { #uc .st-docker { flex-direction: column; align-items: stretch; } }
+#uc .st-docker .st-usedocker { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+#uc .st-docker .st-usedocker:disabled { opacity: .8; }

@@ -535,7 +535,7 @@ Things to know: outside `/mnt` and `/boot` everything lives in RAM, so changes a
 | What | Where |
 |---|---|
 | Your settings | `/boot/config/plugins/uncommander/` on the flash drive |
-| History, lists, ffmpeg | uC's folder on the array - `/mnt/user/appdata/uncommander` by default (Settings → Safety & trash) |
+| History, lists, ffmpeg | uC's folder on a pool or the array - new installs use Docker's *Default appdata storage location* + `/uncommander` (Settings → Safety & trash; **Use it** switches an older install over) |
 | Deleted items | `.uncommander-trash` at the top of each share or disk |
 | Tool results | In memory, for a day (a reboot clears them) |
 

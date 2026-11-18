@@ -10075,8 +10075,9 @@
           <span class="muted">On: Delete moves things to the trash, where you can get them back. Off: Delete erases them immediately and for good.</span></span></label>
         <div class="field st-days-f"><label>Keep deleted items and History for (days)</label><input type="text" inputmode="numeric" class="st-days" value="${esc(w.trash_days)}"></div>
         <div class="muted">After this many days, deleted items are removed from the trash for good and History forgets its older steps. 0 keeps both until you empty them yourself.</div>
-        <div class="field"><label>unCommander's folder</label><input type="text" class="st-histdir" value="${esc(w.hist_dir || '')}" placeholder="/mnt/user/appdata/uncommander" spellcheck="false"></div>
-        <div class="muted">History, the tools' lists (playlists, Radarr, TV, Lidarr) and ffmpeg live here - on the array or a pool, so they don't wear the flash drive. Empty means /mnt/user/appdata/uncommander. Changing it moves the files along. While the array is stopped, History waits in memory and moves here when it starts. Once a day, if a list changed, a small copy (a few KB) is saved on the flash drive for unRAID's flash backup.</div>
+        <div class="field"><label>unCommander's folder</label><input type="text" class="st-histdir" value="${esc(w.hist_dir || SET.data_dir || '')}" placeholder="${esc(SET.docker_dir || '/mnt/user/appdata/uncommander')}" spellcheck="false"></div>
+        ${SET.docker_dir && SET.docker_dir !== SET.data_dir ? `<div class="st-docker"><div class="st-docker-t"><b>Your Docker appdata location is different</b><span>Settings › Docker keeps appdata in <code>${esc(SET.docker_dir.replace(/\/uncommander$/, ''))}</code>. Keep unCommander's files there too:</span><code class="st-docker-p">${esc(SET.docker_dir)}</code></div><button type="button" class="uc-btn st-usedocker">Use Docker's location</button></div>` : ''}
+        <div class="muted">History, the tools' lists (playlists, Radarr, TV, Lidarr) and ffmpeg live here - on the array or a pool, so they don't wear the flash drive. Changing it moves the files along. While the array is stopped, History waits in memory and moves here when it starts. Once a day, if a list changed, a small copy (a few KB) is saved on the flash drive for unRAID's flash backup.</div>
         <div class="st-row st-empty-row"><button type="button" class="uc-btn primary st-clean">Clean up…</button>
           <span class="muted">See what unCommander keeps - the trash, History, caches, leftovers, ffmpeg - how much space each takes, and clear what you pick.</span></div>
         <div class="st-row st-empty-row"><button type="button" class="uc-btn danger st-empty-now" ${SET.practice ? 'disabled title="Practice mode is on"' : ''}>Empty the trash now</button>
@@ -10138,6 +10139,7 @@
         store.set('tabrowAll', rowAll); if (rowAll !== rowWas) setTimeout(() => location.reload(), 600);
         w.trash = $('.st-trash', dlg).checked;
         w.hist_dir = $('.st-histdir', dlg).value.trim();
+        if (w.hist_dir === '/mnt/user/appdata/uncommander' && !SET.hist_dir) w.hist_dir = '';   // unchanged from the old default
         w.notify_unraid = $('.st-notify', dlg).checked;
         w.tap_mode = ($('input[name=st-tap]:checked', dlg) || {}).value || 'auto';
         w.highlight = $('.st-hl', dlg).checked;
@@ -10253,6 +10255,7 @@
       show();
     }
     const cl = $('.st-clean', dlg); if (cl) cl.addEventListener('click', () => openCleanup());
+    const ud = $('.st-usedocker', dlg); if (ud) ud.addEventListener('click', () => { const i = $('.st-histdir', dlg); i.value = SET.docker_dir; i.focus(); ud.disabled = true; ud.textContent = 'Set - press Save to move the files'; });
     const emptyNow = $('.st-empty-now', dlg);
     if (emptyNow) emptyNow.addEventListener('click', async () => {
       if (!emptyNow.dataset.sure) { emptyNow.dataset.sure = '1'; emptyNow.textContent = 'Sure? Delete everything in the trash'; emptyNow.classList.add('primary'); return; }
@@ -10799,7 +10802,7 @@
 
   /* ---------- first launch: where unCommander's folder goes (required) ---------- */
   function openSetup() {
-    const def = SET.data_dir || '/mnt/user/appdata/uncommander';
+    const def = SET.docker_dir || SET.data_dir || '/mnt/user/appdata/uncommander';   // a new install: Docker's appdata location
     openDlg('Welcome to unCommander', `<div class="su-intro">unCommander keeps a few working files: <b>History</b> (so changes can be undone), the <b>lists</b> its tools make (playlists, Radarr, TV, Lidarr), and <b>ffmpeg</b> when a video first needs it. None of it is needed to boot, so it goes on your array or a pool - <b>not on the flash drive</b>, which isn't made for constant writing.</div>
       <label class="tg-af"><span>Where should unCommander keep its files?</span><span class="pl-inrow"><input type="text" class="su-dir" value="${esc(def)}" spellcheck="false"><button type="button" class="uc-btn su-brw">Browse…</button></span></label>
       <div class="fb-box su-fb" hidden></div>

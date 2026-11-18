@@ -28,6 +28,14 @@ function uc_array_up(): bool {
   if ($up === null) { $v = @parse_ini_file('/var/local/emhttp/var.ini') ?: []; $up = ($v['mdState'] ?? '') === 'STARTED' || getenv('UC_ARRAY_UP') === '1'; }
   return $up;
 }
+/* Docker's "Default appdata storage location" (Settings > Docker) + /uncommander - where a new install
+ * puts its folder, like a docker would. /mnt/user/appdata if Docker isn't set up. */
+function uc_docker_dir(): string {
+  $c = @parse_ini_file('/boot/config/docker.cfg') ?: [];
+  $d = rtrim(trim((string)($c['DOCKER_APP_CONFIG_PATH'] ?? '')), '/');
+  return ($d !== '' && preg_match('#^/mnt/[^/]+/#', $d . '/') && !str_contains($d, '..') ? $d : '/mnt/user/appdata') . '/uncommander';
+}
+/* unCommander's folder. An empty setting is the folder installs before 2026.11.15 used - they keep it */
 function uc_hist_dir(): string {
   $f = dirname(UC_CFG) . '/settings.json'; $s = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
   $d = rtrim(trim((string)($s['hist_dir'] ?? '')), '/');

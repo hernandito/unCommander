@@ -1,3 +1,6 @@
+###2026.11.18
+- unCommander's folder follows Docker's "Default appdata storage location" (Settings > Docker) on new installs. Existing installs keep their folder; when the two differ, Settings > Safety & trash shows a "Use Docker's location" button that moves it there
+
 ###2026.11.14
 - Profiles: save what both panes show (folders, sort, columns, view, tree, ticks, filter, music view and player) under a name and bring it back with one click from the box next to New tab. Kept on the server for every browser
 - RAW photos (Fuji, Nikon, Canon, Sony, DNG, Olympus, Panasonic, Pentax, Samsung) in the viewer and Gallery; right-click > Save as JPG. RAW files are never changed

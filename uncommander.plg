@@ -1,13 +1,16 @@
 <?xml version='1.0' standalone='yes'?>
 <!DOCTYPE PLUGIN [
 <!ENTITY name    "uncommander">
-<!ENTITY version "2026.11.14">
+<!ENTITY version "2026.11.18">
 <!ENTITY plugdir "/usr/local/emhttp/plugins/uncommander">
 <!ENTITY cfgdir  "/boot/config/plugins/uncommander">
 ]>
 <PLUGIN name="&name;" author="hernandito" version="&version;" pluginURL="https://raw.githubusercontent.com/hernandito/unCommander/main/uncommander.plg" min="6.12.0" icon="uncommander.png" launch="UnCommander" support="https://forums.unraid.net/topic/200949-plugin-uncommander-%E2%AD%90-a-powerful-two-pane-file-manager/">
 
 <CHANGES>
+###2026.11.18
+- unCommander's folder follows Docker's "Default appdata storage location" (Settings &gt; Docker) on new installs. Existing installs keep their folder; when the two differ, Settings &gt; Safety &amp; trash shows a "Use Docker's location" button that moves it there
+
 ###2026.11.14
 - Profiles: save what both panes show (folders, sort, columns, view, tree, ticks, filter, music view and player) under a name and bring it back with one click from the box next to New tab. Kept on the server for every browser
 - RAW photos (Fuji, Nikon, Canon, Sony, DNG, Olympus, Panasonic, Pentax, Samsung) in the viewer and Gallery; right-click &gt; Save as JPG. RAW files are never changed
@@ -3536,6 +3539,17 @@ html.uc-noselect input, html.uc-noselect textarea, html.uc-noselect #uc .uc-dlg 
 @keyframes fan-pulse { 50% { opacity: .55; } }
 #uc .gp-body:hover .gp-fan:not(.loading) .fc1 { transform: rotate(-14deg) translateX(-24%); }
 #uc .gp-body:hover .gp-fan:not(.loading) .fc2 { transform: rotate(14deg) translateX(24%); }
+/* Settings > Safety & trash: when Docker keeps appdata somewhere else, a clear box to switch */
+#uc .st-docker { display: flex; align-items: center; gap: 14px; margin: 4px 0 6px; padding: 12px 14px; border: 1px solid var(--accent); border-left-width: 4px; border-radius: 8px; background: var(--accent-soft); }
+#uc .st-docker-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: calc(13px * var(--fs, 1)); }
+#uc .st-docker-t b { color: var(--ink); }
+#uc .st-docker-t span { color: var(--ink-2); }
+#uc .st-docker code { font-family: var(--mono); font-size: .95em; overflow-wrap: anywhere; }
+#uc .st-docker-p { color: var(--accent); font-weight: 600; }
+#uc .st-docker .uc-btn { flex: none; }
+@media (max-width: 640px) { #uc .st-docker { flex-direction: column; align-items: stretch; } }
+#uc .st-docker .st-usedocker { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+#uc .st-docker .st-usedocker:disabled { opacity: .8; }
 ]]></INLINE>
 </FILE>
 <FILE Name="/usr/local/emhttp/plugins/uncommander/images/apple-touch-icon.png.b64" Mode="0644">
@@ -6986,7 +7000,7 @@ try {
       if (uc_array_up()) { if (!is_dir($d) && !@mkdir($d, 0777, true)) throw new UcError("Couldn't make $d"); if (!is_writable($d)) throw new UcError("unCommander can't write in $d"); }
       $f = dirname(UC_CFG) . '/settings.json'; @mkdir(dirname($f), 0777, true);
       $all = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
-      $old = uc_hist_dir(); $all['hist_dir'] = $d === '/mnt/user/appdata/uncommander' ? '' : $d;
+      $old = uc_hist_dir(); $all['hist_dir'] = $d;        // always written out, so it never depends on Docker's setting later
       if (!is_file($f)) $all['practice'] = true;        // a new install starts in Practice mode (nothing can be lost)
       file_put_contents("$f.tmp", json_encode($all, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); rename("$f.tmp", $f);
       if ($old !== $d) uc_data_move($old, $d);
@@ -8952,6 +8966,14 @@ function uc_array_up(): bool {
   if ($up === null) { $v = @parse_ini_file('/var/local/emhttp/var.ini') ?: []; $up = ($v['mdState'] ?? '') === 'STARTED' || getenv('UC_ARRAY_UP') === '1'; }
   return $up;
 }
+/* Docker's "Default appdata storage location" (Settings > Docker) + /uncommander - where a new install
+ * puts its folder, like a docker would. /mnt/user/appdata if Docker isn't set up. */
+function uc_docker_dir(): string {
+  $c = @parse_ini_file('/boot/config/docker.cfg') ?: [];
+  $d = rtrim(trim((string)($c['DOCKER_APP_CONFIG_PATH'] ?? '')), '/');
+  return ($d !== '' && preg_match('#^/mnt/[^/]+/#', $d . '/') && !str_contains($d, '..') ? $d : '/mnt/user/appdata') . '/uncommander';
+}
+/* unCommander's folder. An empty setting is the folder installs before 2026.11.15 used - they keep it */
 function uc_hist_dir(): string {
   $f = dirname(UC_CFG) . '/settings.json'; $s = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
   $d = rtrim(trim((string)($s['hist_dir'] ?? '')), '/');
@@ -9755,6 +9777,7 @@ function uc_settings(): array {
     'first'      => !is_file($f),                            // a new install: the setup window asks where unCommander's folder goes
     'array'      => uc_array_up(),
     'data_dir'   => uc_hist_dir(),
+    'docker_dir' => uc_docker_dir(),                         // Docker's appdata location + /uncommander
     'hist_dir'   => (string)($s['hist_dir'] ?? ''),           // Settings > Trash & History: where History is kept (empty = appdata)   // the music player at the bottom (Settings > General)
     'pldirs'     => uc_pldirs_clean($s['pldirs'] ?? []),
   ];
@@ -22468,8 +22491,9 @@ window.UC_COVER_FONT = [
           <span class="muted">On: Delete moves things to the trash, where you can get them back. Off: Delete erases them immediately and for good.</span></span></label>
         <div class="field st-days-f"><label>Keep deleted items and History for (days)</label><input type="text" inputmode="numeric" class="st-days" value="${esc(w.trash_days)}"></div>
         <div class="muted">After this many days, deleted items are removed from the trash for good and History forgets its older steps. 0 keeps both until you empty them yourself.</div>
-        <div class="field"><label>unCommander's folder</label><input type="text" class="st-histdir" value="${esc(w.hist_dir || '')}" placeholder="/mnt/user/appdata/uncommander" spellcheck="false"></div>
-        <div class="muted">History, the tools' lists (playlists, Radarr, TV, Lidarr) and ffmpeg live here - on the array or a pool, so they don't wear the flash drive. Empty means /mnt/user/appdata/uncommander. Changing it moves the files along. While the array is stopped, History waits in memory and moves here when it starts. Once a day, if a list changed, a small copy (a few KB) is saved on the flash drive for unRAID's flash backup.</div>
+        <div class="field"><label>unCommander's folder</label><input type="text" class="st-histdir" value="${esc(w.hist_dir || SET.data_dir || '')}" placeholder="${esc(SET.docker_dir || '/mnt/user/appdata/uncommander')}" spellcheck="false"></div>
+        ${SET.docker_dir && SET.docker_dir !== SET.data_dir ? `<div class="st-docker"><div class="st-docker-t"><b>Your Docker appdata location is different</b><span>Settings › Docker keeps appdata in <code>${esc(SET.docker_dir.replace(/\/uncommander$/, ''))}</code>. Keep unCommander's files there too:</span><code class="st-docker-p">${esc(SET.docker_dir)}</code></div><button type="button" class="uc-btn st-usedocker">Use Docker's location</button></div>` : ''}
+        <div class="muted">History, the tools' lists (playlists, Radarr, TV, Lidarr) and ffmpeg live here - on the array or a pool, so they don't wear the flash drive. Changing it moves the files along. While the array is stopped, History waits in memory and moves here when it starts. Once a day, if a list changed, a small copy (a few KB) is saved on the flash drive for unRAID's flash backup.</div>
         <div class="st-row st-empty-row"><button type="button" class="uc-btn primary st-clean">Clean up…</button>
           <span class="muted">See what unCommander keeps - the trash, History, caches, leftovers, ffmpeg - how much space each takes, and clear what you pick.</span></div>
         <div class="st-row st-empty-row"><button type="button" class="uc-btn danger st-empty-now" ${SET.practice ? 'disabled title="Practice mode is on"' : ''}>Empty the trash now</button>
@@ -22531,6 +22555,7 @@ window.UC_COVER_FONT = [
         store.set('tabrowAll', rowAll); if (rowAll !== rowWas) setTimeout(() => location.reload(), 600);
         w.trash = $('.st-trash', dlg).checked;
         w.hist_dir = $('.st-histdir', dlg).value.trim();
+        if (w.hist_dir === '/mnt/user/appdata/uncommander' && !SET.hist_dir) w.hist_dir = '';   // unchanged from the old default
         w.notify_unraid = $('.st-notify', dlg).checked;
         w.tap_mode = ($('input[name=st-tap]:checked', dlg) || {}).value || 'auto';
         w.highlight = $('.st-hl', dlg).checked;
@@ -22646,6 +22671,7 @@ window.UC_COVER_FONT = [
       show();
     }
     const cl = $('.st-clean', dlg); if (cl) cl.addEventListener('click', () => openCleanup());
+    const ud = $('.st-usedocker', dlg); if (ud) ud.addEventListener('click', () => { const i = $('.st-histdir', dlg); i.value = SET.docker_dir; i.focus(); ud.disabled = true; ud.textContent = 'Set - press Save to move the files'; });
     const emptyNow = $('.st-empty-now', dlg);
     if (emptyNow) emptyNow.addEventListener('click', async () => {
       if (!emptyNow.dataset.sure) { emptyNow.dataset.sure = '1'; emptyNow.textContent = 'Sure? Delete everything in the trash'; emptyNow.classList.add('primary'); return; }
@@ -23192,7 +23218,7 @@ window.UC_COVER_FONT = [
 
   /* ---------- first launch: where unCommander's folder goes (required) ---------- */
   function openSetup() {
-    const def = SET.data_dir || '/mnt/user/appdata/uncommander';
+    const def = SET.docker_dir || SET.data_dir || '/mnt/user/appdata/uncommander';   // a new install: Docker's appdata location
     openDlg('Welcome to unCommander', `<div class="su-intro">unCommander keeps a few working files: <b>History</b> (so changes can be undone), the <b>lists</b> its tools make (playlists, Radarr, TV, Lidarr), and <b>ffmpeg</b> when a video first needs it. None of it is needed to boot, so it goes on your array or a pool - <b>not on the flash drive</b>, which isn't made for constant writing.</div>
       <label class="tg-af"><span>Where should unCommander keep its files?</span><span class="pl-inrow"><input type="text" class="su-dir" value="${esc(def)}" spellcheck="false"><button type="button" class="uc-btn su-brw">Browse…</button></span></label>
       <div class="fb-box su-fb" hidden></div>

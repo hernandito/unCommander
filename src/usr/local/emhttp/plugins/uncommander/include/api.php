@@ -2201,7 +2201,7 @@ try {
       if (uc_array_up()) { if (!is_dir($d) && !@mkdir($d, 0777, true)) throw new UcError("Couldn't make $d"); if (!is_writable($d)) throw new UcError("unCommander can't write in $d"); }
       $f = dirname(UC_CFG) . '/settings.json'; @mkdir(dirname($f), 0777, true);
       $all = is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
-      $old = uc_hist_dir(); $all['hist_dir'] = $d === '/mnt/user/appdata/uncommander' ? '' : $d;
+      $old = uc_hist_dir(); $all['hist_dir'] = $d;        // always written out, so it never depends on Docker's setting later
       if (!is_file($f)) $all['practice'] = true;        // a new install starts in Practice mode (nothing can be lost)
       file_put_contents("$f.tmp", json_encode($all, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); rename("$f.tmp", $f);
       if ($old !== $d) uc_data_move($old, $d);
